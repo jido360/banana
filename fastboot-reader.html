@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Muhammad El Khwaga – Fastboot</title>
+<style>
+:root{--bg:#0C111B;--card:#131A27;--line:#243047;--text:#EAF0FA;--muted:#93A1B8;--accent:#5EA2FF;--ink:#06121F;--bad:#FF8A80}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans Arabic',system-ui,'Segoe UI',Tahoma,sans-serif;margin:0;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:100vh}
+header{display:flex;align-items:center;gap:16px}
+.brand{font-size:22px;font-weight:700}
+nav{display:flex;gap:20px}
+nav a{color:var(--muted);text-decoration:none;font-size:16px;padding:10px 4px}
+nav a:hover,nav a[aria-current]{color:var(--accent)}
+.acct{margin-inline-start:auto;width:44px;padding:0;border-radius:50%;display:grid;place-items:center}
+h1{font-size:20px;margin:0}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+button{font:inherit;font-size:15px;border-radius:8px;border:1px solid #33425E;background:var(--card);color:var(--text);padding:9px 16px;min-height:44px;cursor:pointer}
+button.main{background:var(--accent);color:var(--ink);border-color:var(--accent);font-weight:700}
+button:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#status{color:var(--muted);font-size:15px;margin-inline-start:auto}
+#status.on{color:var(--accent)}
+#err{color:var(--bad);min-height:20px;font-size:15px;line-height:1.7}
+.note{color:var(--muted);font-size:14px;line-height:1.7}
+dl{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.row{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+dt{color:var(--muted);font-size:14px;margin-bottom:4px}
+dd{margin:0;font-size:16px;direction:ltr;text-align:right;word-break:break-all;font-family:'IBM Plex Mono',ui-monospace,Consolas,monospace}
+dd.na{color:var(--muted);font-family:inherit;direction:rtl}
+.h2{font-size:17px;margin:8px 0 0}
+#logview{direction:ltr;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;max-height:50vh;min-height:120px;overflow:auto;white-space:pre-wrap;word-break:break-all;font:13px/1.5 'IBM Plex Mono',ui-monospace,Consolas,monospace;margin:0}
+/* polish: layout */
+body>*:not(#loader){width:100%;max-width:1100px;margin-inline:auto}
+header{padding-bottom:14px;border-bottom:1px solid var(--line)}
+.brand{letter-spacing:-.5px}
+h1{font-size:24px}
+footer{margin-top:auto;padding:20px 0 4px;text-align:center;color:var(--muted);font-size:14px;border-top:1px solid var(--line)}
+footer b{color:var(--text)}
+/* polish: controls */
+button,.row,#log,#logview,#analysis{transition:transform .15s,background .15s,border-color .2s,filter .15s}
+button:hover:not(:disabled){transform:translateY(-1px);border-color:var(--accent)}
+button.main:hover:not(:disabled){filter:brightness(1.08)}
+button:active:not(:disabled){transform:scale(.98)}
+.row:hover{transform:translateY(-2px);border-color:var(--accent)}
+#status{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 14px}
+#status::before{content:"";width:8px;height:8px;border-radius:50%;background:#6B7280}
+#status.on::before{background:var(--accent);animation:pulse 1.6s ease infinite}
+/* polish: entrance */
+header{animation:down .6s ease 1s both}
+body>*:nth-child(3){animation:up .6s ease 1.05s both}
+body>*:nth-child(4){animation:up .6s ease 1.12s both}
+body>*:nth-child(5){animation:up .6s ease 1.19s both}
+body>*:nth-child(6){animation:up .6s ease 1.26s both}
+body>*:nth-child(n+7){animation:up .6s ease 1.33s both}
+@keyframes up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes down{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(94,162,255,.6)}70%{box-shadow:0 0 0 8px rgba(94,162,255,0)}100%{box-shadow:0 0 0 0 rgba(94,162,255,0)}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes loaderOut{to{opacity:0;visibility:hidden}}
+/* polish: loading screen (about 1 second) */
+#loader{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;animation:loaderOut .4s ease 1s forwards}
+#loader svg{width:64px;height:90px}
+#loader .ld{stroke-dasharray:100;stroke-dashoffset:100;animation:draw .9s ease .1s forwards}
+#loader span{font-size:22px;font-weight:700;letter-spacing:-.5px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}#loader{display:none}}
+/* top bar v2 */
+header{position:sticky;top:0;z-index:20;background:var(--bg);flex-wrap:wrap;gap:12px 24px}
+.logo{display:flex;align-items:center;gap:10px;color:var(--text);text-decoration:none}
+.brand em{font-style:normal;color:var(--accent)}
+.logo:hover .pl{stroke-dasharray:100;animation:blip .8s ease}
+@keyframes blip{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+nav{display:flex;gap:18px;overflow-x:auto}
+nav a.tab{position:relative;color:var(--muted);font-size:16px;padding:10px 2px;white-space:nowrap;text-decoration:none}
+nav a.tab small{font-size:12px;color:var(--muted);margin-inline-start:4px}
+nav a.tab::after{content:"";position:absolute;inset-inline:0;bottom:2px;height:2px;background:var(--accent);transform:scaleX(0);transform-origin:right;transition:transform .25s ease}
+nav a.tab:hover,nav a.tab[aria-current]{color:var(--text)}
+nav a.tab:hover::after,nav a.tab[aria-current]::after{transform:scaleX(1)}
+[data-tip]{position:relative}
+[data-tip]:hover::before{content:attr(data-tip);position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--card);border:1px solid var(--accent);color:var(--text);font-size:13px;padding:6px 10px;border-radius:4px;z-index:40;pointer-events:none;animation:tipin .2s ease}
+@keyframes tipin{from{opacity:0}to{opacity:1}}
+.acctwrap{position:relative;margin-inline-start:auto}
+.acct{margin-inline-start:0;transition:transform .2s,border-color .2s}
+.acct:hover{transform:rotate(-8deg) scale(1.05)}
+.menu{position:absolute;inset-inline-end:0;top:calc(100% + 8px);min-width:190px;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:6px;z-index:30;animation:up .18s ease both}
+.menu button{display:block;width:100%;text-align:start;border:0;background:transparent;min-height:40px;border-radius:4px}
+.menu button:hover:not(:disabled){background:#1A2438;transform:none}
+#toast{position:fixed;bottom:20px;inset-inline:0;margin:auto;width:max-content;max-width:90vw;background:var(--card);border:1px solid var(--accent);color:var(--text);padding:10px 18px;border-radius:6px;font-size:15px;opacity:0;transform:translateY(10px);transition:opacity .25s,transform .25s;pointer-events:none;z-index:200}
+#toast.show{opacity:1;transform:none}
+/* less generic: squarer shapes, mono labels */
+button,select{border-radius:4px}
+.row,#log,#logview,#analysis,#findings li{border-radius:6px}
+#status{border-radius:4px;font-family:'IBM Plex Mono',ui-monospace,Consolas,monospace;font-size:13px}
+footer{font-family:'IBM Plex Mono',ui-monospace,Consolas,monospace;font-size:13px}
+/* friendlier layout */
+.note{margin:0}
+.gh{font-size:15px;margin:12px 0 8px;color:var(--muted);font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px}
+button.row{display:block;width:100%;min-height:0;text-align:start;padding:10px 14px;border:1px solid var(--line);background:var(--card);color:var(--text)}
+button.row:disabled{opacity:1;cursor:default}
+.row .k{display:block;color:var(--muted);font-size:13px;margin-bottom:2px}
+.row .v{display:block;font:15px 'IBM Plex Mono',ui-monospace,Consolas,monospace;direction:ltr;text-align:right;word-break:break-all}
+.row .v.na{color:var(--muted);font-family:inherit;direction:rtl}
+.empty{padding:22px;text-align:center;border:1px dashed var(--line);border-radius:6px;color:var(--muted)}
+.lg[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+#logview{height:clamp(150px,28vh,260px);min-height:0;max-height:none;padding:10px 12px;font-size:12.5px}
+#logview:empty::before{content:"اختر نوع السجل من الأزرار بالأعلى بعد الاتصال بالهاتف.";display:block;text-align:center;padding-top:44px;color:var(--muted);direction:rtl;font:15px 'IBM Plex Sans Arabic',system-ui,'Segoe UI',Tahoma,sans-serif}
+.bigl #logview{height:68vh}
+/* step boxes */
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+body>.steps{animation:none!important}
+.steps li:nth-child(1){--d:1.15s}.steps li:nth-child(2){--d:1.25s}.steps li:nth-child(3){--d:1.35s}
+button.step{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;text-align:start;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:6px;color:var(--text);font-size:15px;line-height:1.5;animation:stepIn .5s ease var(--d,1.2s) both}
+button.step:hover{border-color:var(--accent);transform:translateY(-2px)}
+.step .num{flex:none;display:grid;place-items:center;width:32px;height:32px;border:1px solid var(--accent);border-radius:4px;color:var(--accent);font:700 16px 'IBM Plex Mono',ui-monospace,Consolas,monospace;transition:background .25s,color .25s}
+.step .chk{flex:none;margin-inline-start:auto;color:var(--accent);opacity:0;transform:scale(.4);transition:opacity .25s,transform .25s}
+.step.active{border-color:var(--accent);animation:stepIn .5s ease var(--d,1.2s) both,glow 2.2s ease-in-out calc(var(--d,1.2s) + .6s) infinite}
+.step.active .num{background:var(--accent);color:var(--ink)}
+.step.done{border-color:var(--accent);background:#0F2038}
+.step.done .num{background:var(--accent);color:var(--ink);animation:pop .35s ease}
+.step.done .chk{opacity:1;transform:none}
+@keyframes stepIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(94,162,255,0)}50%{box-shadow:0 0 0 4px rgba(94,162,255,.28)}}
+@keyframes pop{50%{transform:scale(1.25)}}
+/* thermal */
+.chk2{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:15px;min-height:44px}
+.chk2 input{width:18px;height:18px;accent-color:var(--accent)}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}
+.tc{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px 14px;display:flex;flex-direction:column;gap:4px}
+.tc .k{color:var(--muted);font-size:13px}
+.tc .v{font:700 20px 'IBM Plex Mono',ui-monospace,Consolas,monospace;direction:ltr;text-align:right}
+.tc .v.ok{color:#34D399}.tc .v.warn{color:#FBBF24}.tc .v.hot{color:#FB923C}.tc .v.crit{color:#F87171}
+.lvl{align-self:flex-start;font:600 12px 'IBM Plex Sans Arabic',system-ui,'Segoe UI',Tahoma,sans-serif;padding:2px 8px;border-radius:4px}
+.lvl.ok{background:#12302a;color:#34D399}.lvl.warn{background:#332b10;color:#FBBF24}.lvl.hot{background:#34210f;color:#FB923C}.lvl.crit{background:#3a1616;color:#F87171}
+.advice{margin:10px 0 0;padding:12px 14px;border:1px solid var(--line);border-radius:6px;line-height:1.8;font-size:15px}
+.advice.ok{border-color:#34D399}.advice.warn{border-color:#FBBF24}.advice.crit{border-color:#F87171}
+#thermal details{margin-top:10px;color:var(--muted)}
+#thermal summary{cursor:pointer}
+.tl{margin:8px 0 0;padding:0 18px;line-height:1.8;direction:ltr;text-align:left;font:13px 'IBM Plex Mono',ui-monospace,Consolas,monospace}
+#thermal:empty::before{content:"اضغط «قراءة الحرارة» بعد الاتصال بالهاتف.";display:block;text-align:center;padding:22px;color:var(--muted);border:1px dashed var(--line);border-radius:6px}
+/* fastboot page */
+.logbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.logbar .grow{flex:1}
+.logbar button{min-height:36px;padding:5px 14px;font-size:14px}
+input.cmd{flex:1;min-width:220px;min-height:44px;background:var(--card);color:var(--text);border:1px solid #33425E;border-radius:4px;padding:8px 12px;direction:ltr;text-align:left;font:14px 'IBM Plex Mono',ui-monospace,Consolas,monospace}
+input.cmd:disabled{opacity:.45}
+.danger{border-color:#F87171;color:#F87171}
+.danger:hover:not(:disabled){background:#3a1616;border-color:#F87171!important}
+details.dz{border:1px solid #5a2a2a;border-radius:6px;padding:10px 14px}
+details.dz summary{cursor:pointer;color:#F87171}
+details.dz .bar{margin-top:10px}
+.sub{color:var(--muted);font-size:14px;margin:0}
+#logview:empty::before{content:"ستظهر نتيجة الأوامر هنا.";}
+.steps li:nth-child(3){--d:1.35s}
+/* look v2: ink-blue palette, Plex fonts, panel toolbars */
+html{color-scheme:dark}
+body{font-weight:400}
+button,select,input.cmd{border-radius:8px}
+button{background:#1A2438;border:1px solid #2C3B57;font-weight:500;min-height:46px}
+button:hover:not(:disabled){background:#202C45;border-color:var(--accent)}
+button.main{background:var(--accent);border-color:var(--accent);color:var(--ink);font-weight:700;padding:9px 22px}
+button.main:hover:not(:disabled){background:#7DB4FF;border-color:#7DB4FF}
+select{background:#1A2438;border-color:#2C3B57;min-height:46px}
+.bar{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.logbar{gap:0}
+.logbar strong{margin-inline-end:10px}
+.logbar button{border-radius:0;min-height:38px}
+.logbar button + button{margin-inline-start:-1px}
+.logbar button:first-of-type{border-start-start-radius:8px;border-end-start-radius:8px}
+.logbar button:last-of-type{border-start-end-radius:8px;border-end-end-radius:8px}
+.logbar button:hover:not(:disabled){transform:none;position:relative;z-index:1}
+.row,.tc,#log,#logview,#analysis,button.step,.menu{border-radius:10px}
+h1,.h2,.gh{letter-spacing:-.2px}
+h1{font-weight:700}
+.brand{font-weight:700}
+</style>
+</head>
+<body>
+<div id="loader" aria-hidden="true"><svg viewBox="0 0 60 84" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="4" width="48" height="76" rx="9" fill="none" stroke="#5EA2FF" stroke-width="4"/><line x1="24" y1="12" x2="36" y2="12" stroke="#5EA2FF" stroke-width="3" stroke-linecap="round"/><polyline class="ld" pathLength="100" points="13,46 22,46 27,28 34,64 39,46 47,46" fill="none" stroke="#5EA2FF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span dir="ltr">Muhammad <span style="color:#5EA2FF">El Khwaga</span></span></div>
+<header>
+<a class="logo" href="index.html" aria-label="الرئيسية"><svg width="26" height="36" viewBox="0 0 60 84" role="img" aria-hidden="true"><rect x="6" y="4" width="48" height="76" rx="9" fill="none" stroke="#5EA2FF" stroke-width="4"/><line x1="24" y1="12" x2="36" y2="12" stroke="#5EA2FF" stroke-width="3" stroke-linecap="round"/><polyline class="pl" pathLength="100" points="13,46 22,46 27,28 34,64 39,46 47,46" fill="none" stroke="#5EA2FF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><line x1="24" y1="72" x2="36" y2="72" stroke="#5EA2FF" stroke-width="3" stroke-linecap="round"/></svg><span class="brand" dir="ltr">Muhammad <em>El Khwaga</em></span></a>
+<nav aria-label="الصفحات">
+<a class="tab" href="index.html">الرئيسية</a>
+<a class="tab" href="uart-reader.html">قارئ UART</a>
+<a class="tab" href="adb-reader.html">معلومات ADB</a>
+<a class="tab" href="fastboot-reader.html" aria-current="page">Fastboot</a>
+<a class="tab" href="#" data-tip="الدورة ستتوفر قريباً" data-toast="الدورة ستتوفر قريباً">الدورة <small>قريباً</small></a>
+</nav>
+<div class="acctwrap">
+<button class="acct" aria-label="الحساب" aria-haspopup="menu" aria-expanded="false" data-tip="الحساب"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg></button>
+<div class="menu" role="menu" hidden>
+<button role="menuitem" data-toast="تسجيل الدخول سيتوفر قريباً">تسجيل الدخول</button>
+<button role="menuitem" data-toast="إنشاء الحساب سيتوفر قريباً">إنشاء حساب</button>
+</div>
+</div>
+</header>
+<h1>Fastboot</h1>
+<ol class="steps" aria-label="الخطوات">
+<li><button class="step" aria-pressed="false" title="اضغط لتحديد الخطوة كمنجزة"><span class="num">1</span><span class="txt">أدخل الهاتف في وضع Bootloader (Fastboot)</span><svg class="chk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></button></li>
+<li><button class="step" aria-pressed="false" title="اضغط لتحديد الخطوة كمنجزة"><span class="num">2</span><span class="txt">وصّل الهاتف بالكمبيوتر بكابل USB</span><svg class="chk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></button></li>
+<li><button class="step" aria-pressed="false" title="اضغط للاتصال"><span class="num">3</span><span class="txt">اضغط «اتصال» واختر الهاتف</span><svg class="chk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></button></li>
+</ol>
+<p class="note">يجب أن يكون الهاتف في وضع Bootloader (غالباً: اضغط خفض الصوت + زر التشغيل أثناء التشغيل، أو من ADB: adb reboot bootloader). أغلق أي أداة أخرى تستخدم الهاتف. على ويندوز قد تحتاج تعريف WinUSB. المعلومات تظهر هنا فقط ولا تُرفع إلى أي خادم.</p>
+<div class="bar">
+<button id="connect" class="main">اتصال بالهاتف</button>
+<button id="disconnect" disabled>قطع الاتصال</button>
+<span id="status" role="status">غير متصل</span>
+</div>
+<div id="err" role="alert"></div>
+
+<h2 class="h2">معلومات الجهاز وحالة Bootloader</h2>
+<div class="bar"><button id="inforead" class="tg" disabled title="اتصل بالهاتف أولاً">قراءة المعلومات</button></div>
+<div id="info" aria-live="polite"></div>
+
+<h2 class="h2">أوامر عامة</h2>
+<div class="bar">
+<button class="tg" data-act="reboot" disabled>إعادة تشغيل النظام</button>
+<button class="tg" data-act="bootloader" disabled>إعادة تشغيل إلى Bootloader</button>
+<button class="tg" data-act="recovery" disabled>Recovery</button>
+<button class="tg" data-act="fastboot" disabled>fastbootd</button>
+<button class="tg" data-cmd="getvar:all" disabled>قائمة المتغيرات (getvar all)</button>
+<button class="tg" data-cmd="oem device-info" disabled>oem device-info</button>
+</div>
+<div id="slotbar" class="bar" hidden><span class="sub">الفتحة النشطة (A/B):</span>
+<button class="tg" data-cmd="set_active:a" disabled>تفعيل A</button>
+<button class="tg" data-cmd="set_active:b" disabled>تفعيل B</button>
+</div>
+<div class="bar">
+<input id="cmd" class="cmd" type="text" placeholder="أمر مخصص مثل: getvar:product" aria-label="أمر مخصص" disabled>
+<button id="run" class="tg" disabled>نفّذ</button>
+</div>
+<p class="sub">الأوامر التي ترسل ملفات (مثل flash) غير مدعومة هنا.</p>
+<details class="dz">
+<summary>أوامر خطرة (تمسح بيانات أو تغيّر حماية الهاتف)</summary>
+<div class="bar">
+<button class="tg danger" data-danger="unlock" disabled>فتح Bootloader</button>
+<button class="tg danger" data-danger="lock" disabled>قفل Bootloader</button>
+<button class="tg danger" data-danger="erase" disabled>مسح بيانات المستخدم</button>
+</div>
+</details>
+
+<div class="logbar"><strong>النتيجة</strong><span class="grow"></span><button id="lcopy" disabled>نسخ</button><button id="lsave" disabled>حفظ</button><button id="lclear" disabled>مسح</button><button id="lexpand">تكبير</button></div>
+<pre id="logview" tabindex="0" aria-label="النتيجة"></pre>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+(function () {
+  const t = document.getElementById('toast'); let tm;
+  window.toast = m => { t.textContent = m; t.classList.add('show'); clearTimeout(tm); tm = setTimeout(() => t.classList.remove('show'), 2200); };
+  const b = document.querySelector('.acct'), m = document.querySelector('.menu');
+  const close = () => { m.hidden = true; b.setAttribute('aria-expanded', 'false'); };
+  b.addEventListener('click', e => { e.stopPropagation(); const open = m.hidden; m.hidden = !open; b.setAttribute('aria-expanded', String(open)); });
+  document.addEventListener('click', close);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  document.querySelectorAll('[data-toast]').forEach(el => el.addEventListener('click', e => { e.preventDefault(); window.toast(el.dataset.toast); close(); }));
+  const steps = [...document.querySelectorAll('.step')];
+  const mark = () => { const first = steps.find(x => !x.classList.contains('done')); steps.forEach(x => x.classList.toggle('active', x === first)); };
+  const pressed = () => steps.forEach(x => x.setAttribute('aria-pressed', String(x.classList.contains('done'))));
+  window.stepsConnected = on => { steps.forEach((x, i) => { if (on || i === steps.length - 1) x.classList.toggle('done', on); }); pressed(); mark(); };
+  steps.forEach((x, i) => x.addEventListener('click', () => {
+    if (i === steps.length - 1) { const c = document.getElementById('connect'); if (c && !c.disabled) c.click(); return; }
+    x.classList.toggle('done'); pressed(); mark();
+  }));
+  mark();
+})();
+</script>
+<footer>تم البناء بواسطة <b dir="ltr">Osman</b></footer>
+<script type="module">
+const $ = id => document.getElementById(id);
+const errEl = $('err'), infoEl = $('info'), statusEl = $('status'), out = $('logview');
+let dev = null, lib = null, outText = '', busy = false;
+
+async function loadLib() {
+  if (lib) return lib;
+  lib = await import('https://esm.sh/android-fastboot@1.1.3');
+  return lib;
+}
+const textOf = r => (typeof r === 'string' ? r : (r && (r.text ?? r.response)) ?? '');
+const cmd = async c => String(textOf(await dev.runCommand(c)) || '').trim();
+const gv = async n => { try { const v = await dev.getVariable(n); return v == null ? '' : String(v).trim(); } catch (e) { return ''; } };
+
+function log(s) {
+  outText += s + '\n';
+  out.textContent = outText;
+  out.scrollTop = out.scrollHeight;
+  ['lcopy', 'lsave', 'lclear'].forEach(i => $(i).disabled = false);
+}
+function setState(on) {
+  $('connect').disabled = on;
+  $('disconnect').disabled = !on;
+  document.querySelectorAll('.tg').forEach(b => { b.disabled = !on; b.title = on ? '' : 'اتصل بالهاتف أولاً'; });
+  $('cmd').disabled = !on;
+  statusEl.className = on ? 'on' : '';
+  statusEl.textContent = on ? 'متصل' : 'غير متصل';
+  if (window.stepsConnected) stepsConnected(on);
+  if (!on) { $('slotbar').hidden = true; }
+}
+
+const VARS = [['product', 'المنتج'], ['variant', 'النسخة'], ['hw-revision', 'مراجعة العتاد'], ['serialno', 'الرقم التسلسلي'],
+  ['version-bootloader', 'إصدار Bootloader'], ['version-baseband', 'إصدار Baseband'], ['current-slot', 'الفتحة الحالية'],
+  ['slot-count', 'عدد الفتحات'], ['max-download-size', 'أقصى حجم تحميل'], ['battery-voltage', 'جهد البطارية'], ['secure', 'Secure']];
+
+function card(k, v, cls) {
+  const d = document.createElement('div'); d.className = 'tc';
+  const kk = document.createElement('span'); kk.className = 'k'; kk.textContent = k;
+  const vv = document.createElement('span'); vv.className = 'v ' + (cls || ''); vv.textContent = v;
+  d.append(kk, vv); return d;
+}
+function row(label, value) {
+  const d = document.createElement('button'); d.className = 'row';
+  const k = document.createElement('span'); k.className = 'k'; k.textContent = label;
+  const v = document.createElement('span'); v.className = 'v';
+  if (value) { v.textContent = value; d.title = 'اضغط للنسخ'; d.onclick = async () => { try { await navigator.clipboard.writeText(value); toast('تم نسخ ' + label); } catch (e) {} }; }
+  else { v.textContent = 'غير متاح'; v.className = 'v na'; d.disabled = true; }
+  d.append(k, v); return d;
+}
+
+async function readInfo() {
+  if (!dev || busy) return;
+  busy = true; errEl.textContent = '';
+  infoEl.textContent = '';
+  const w = document.createElement('p'); w.className = 'note empty'; w.textContent = 'جارٍ قراءة المعلومات...'; infoEl.append(w);
+  try {
+    const vals = {};
+    for (const [k] of VARS) vals[k] = await gv(k);
+    const unl = (await gv('unlocked')).toLowerCase();
+    let state = (unl === 'yes' || unl === 'true') ? 'unlocked' : (unl === 'no' || unl === 'false') ? 'locked' : '';
+    if (!state) {
+      try { const m = (await cmd('oem device-info')).match(/unlocked:\s*(true|false)/i); if (m) state = m[1].toLowerCase() === 'true' ? 'unlocked' : 'locked'; } catch (e) {}
+    }
+    const us = (await gv('is-userspace')).toLowerCase();
+    infoEl.textContent = '';
+    const top = document.createElement('div'); top.className = 'tgrid';
+    top.append(card('حالة Bootloader', state === 'unlocked' ? 'مفتوح' : state === 'locked' ? 'مقفل' : 'غير معروف', state === 'unlocked' ? 'warn' : state === 'locked' ? 'ok' : ''));
+    top.append(card('الوضع الحالي', us === 'yes' ? 'fastbootd' : us === 'no' ? 'bootloader' : 'غير معروف', ''));
+    infoEl.append(top);
+    const g = document.createElement('div'); g.className = 'grid'; g.style.marginTop = '8px';
+    VARS.forEach(([k, label]) => {
+      let v = vals[k];
+      if (k === 'max-download-size' && /^0x[0-9a-f]+$/i.test(v)) v = Math.round(parseInt(v, 16) / 1048576) + ' MB';
+      g.append(row(label, v));
+    });
+    infoEl.append(g);
+    const a = document.createElement('p');
+    a.className = 'advice ' + (state === 'unlocked' ? 'warn' : state === 'locked' ? 'ok' : '');
+    a.textContent = state === 'locked'
+      ? 'Bootloader مقفل: هذا هو وضع الأمان الافتراضي. لتحميل نظام مخصص يجب فتحه أولاً، وفتحه يمسح بيانات الهاتف.'
+      : state === 'unlocked'
+      ? 'Bootloader مفتوح: يمكن تحميل أنظمة مخصصة، لكن الأمان أقل وقد ترفض بعض تطبيقات البنوك والأمان العمل.'
+      : 'لم يُرجع الهاتف حالة Bootloader. جرّب الأمر «oem device-info» من الأوامر العامة. أسماء المتغيرات تختلف حسب الشركة.';
+    infoEl.append(a);
+    $('slotbar').hidden = !(parseInt(vals['slot-count'], 10) > 1);
+    toast('تمت قراءة المعلومات');
+  } catch (e) {
+    infoEl.textContent = '';
+    errEl.textContent = 'تعذّر قراءة المعلومات: ' + (e && e.message ? e.message : e);
+  }
+  busy = false;
+}
+
+async function connect() {
+  errEl.textContent = '';
+  try {
+    if (!navigator.usb) throw new Error('هذا المتصفح لا يدعم WebUSB. استخدم Chrome أو Edge، وافتح الصفحة عبر localhost أو HTTPS.');
+    statusEl.textContent = 'جارٍ التحميل...';
+    const L = await loadLib();
+    dev = new L.FastbootDevice();
+    await dev.connect();
+    setState(true);
+    toast('تم الاتصال بالهاتف');
+    await readInfo();
+  } catch (e) {
+    errEl.textContent = 'تعذّر الاتصال: ' + (e && e.message ? e.message : e);
+    setState(false); dev = null;
+  }
+}
+async function disconnect(msg) {
+  try { if (dev && dev.device) await dev.device.close(); } catch (e) {}
+  dev = null; infoEl.textContent = ''; setState(false);
+  toast(msg || 'تم قطع الاتصال');
+}
+if (navigator.usb) navigator.usb.addEventListener('disconnect', () => { if (dev) disconnect('انقطع الاتصال بالهاتف'); });
+
+const danger = msg => { const t = prompt(msg + '\n\nاكتب كلمة «تأكيد» للمتابعة:'); return !!t && t.trim() === 'تأكيد'; };
+const DANGER = {
+  unlock: ['flashing unlock', 'فتح Bootloader سيمسح كل بيانات الهاتف وقد يلغي الضمان. قد تحتاج لتأكيد الأمر على شاشة الهاتف.'],
+  lock: ['flashing lock', 'قفل Bootloader على نظام معدّل أو غير رسمي قد يمنع الهاتف من الإقلاع. قد تحتاج لتأكيد الأمر على شاشة الهاتف.'],
+  erase: ['erase:userdata', 'سيتم مسح كل بيانات المستخدم في الهاتف نهائياً.']
+};
+
+async function run(c, label) {
+  if (!dev) return;
+  log('> ' + c);
+  try {
+    const t = await cmd(c);
+    log(t || '(تم بدون رد)');
+    toast('تم تنفيذ: ' + (label || c));
+  } catch (e) {
+    log('خطأ: ' + (e && e.message ? e.message : e));
+    errEl.textContent = 'فشل الأمر: ' + (e && e.message ? e.message : e);
+  }
+}
+async function doReboot(target) {
+  if (!dev) return;
+  log('> reboot ' + target);
+  try { await dev.reboot(target, false); log('تم إرسال أمر إعادة التشغيل.'); await disconnect('تمت إعادة التشغيل'); }
+  catch (e) { log('خطأ: ' + (e && e.message ? e.message : e)); errEl.textContent = 'فشل الأمر: ' + (e && e.message ? e.message : e); }
+}
+
+document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => doReboot(b.dataset.act === 'reboot' ? '' : b.dataset.act));
+document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => run(b.dataset.cmd));
+document.querySelectorAll('[data-danger]').forEach(b => b.onclick = () => {
+  const [c, msg] = DANGER[b.dataset.danger];
+  if (danger(msg)) run(c, b.textContent); else toast('تم الإلغاء');
+});
+const runCustom = () => {
+  const c = $('cmd').value.trim();
+  if (!c) return;
+  if (/^(erase|format|flashing|oem\s+(un)?lock)/i.test(c) && !danger('هذا الأمر قد يمسح بيانات أو يغيّر حماية الهاتف: ' + c)) { toast('تم الإلغاء'); return; }
+  run(c);
+};
+$('run').onclick = runCustom;
+$('cmd').addEventListener('keydown', e => { if (e.key === 'Enter') runCustom(); });
+$('inforead').onclick = readInfo;
+$('connect').onclick = connect;
+$('disconnect').onclick = () => disconnect();
+$('lclear').onclick = () => { outText = ''; out.textContent = ''; ['lcopy', 'lsave', 'lclear'].forEach(i => $(i).disabled = true); };
+$('lcopy').onclick = async () => { try { await navigator.clipboard.writeText(outText); toast('تم النسخ'); } catch (e) { errEl.textContent = 'تعذّر النسخ.'; } };
+$('lsave').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([outText], { type: 'text/plain' }));
+  a.download = 'fastboot-' + new Date().toISOString().replace(/[:.]/g, '-') + '.txt';
+  a.click(); URL.revokeObjectURL(a.href); toast('تم حفظ الملف');
+};
+$('lexpand').onclick = () => { const b = document.body.classList.toggle('bigl'); $('lexpand').textContent = b ? 'تصغير' : 'تكبير'; };
+</script>
+</body>
+</html>
