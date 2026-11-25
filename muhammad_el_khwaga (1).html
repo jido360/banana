@@ -1,0 +1,2131 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="أدوات تشخيص الهواتف من المتصفح: UART وADB وFastboot">
+<title>Muhammad El Khwaga – أدوات تشخيص الهواتف</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #070B14;
+  --bg-elevated: #0D1322;
+  --card: rgba(15, 23, 40, 0.72);
+  --card-solid: #0F1728;
+  --line: rgba(94, 162, 255, 0.16);
+  --line-strong: rgba(94, 162, 255, 0.38);
+  --text: #EEF4FF;
+  --muted: #8E9EB8;
+  --accent: #5EA2FF;
+  --cyan: #38BDF8;
+  --emerald: #34D399;
+  --amber: #FBBF24;
+  --orange: #FB923C;
+  --bad: #F87171;
+  --ink: #040B16;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --shadow-glow: 0 0 30px rgba(94, 162, 255, 0.14);
+  --font-sans: 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+html { color-scheme: dark; scroll-behavior: smooth; }
+html.modal-open, body.modal-open { overflow: hidden; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ===== Ambient Animated Background ===== */
+.ambient-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.cyber-grid {
+  position: absolute;
+  inset: -50%;
+  background-image:
+    linear-gradient(to right, rgba(94, 162, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(94, 162, 255, 0.045) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 20%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 20%, transparent 100%);
+  animation: gridDrift 28s linear infinite;
+}
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.35;
+  animation: floatOrb 18s ease-in-out infinite alternate;
+}
+.orb-1 { width: 420px; height: 420px; background: radial-gradient(circle, #5EA2FF, transparent 70%); top: -120px; right: -80px; }
+.orb-2 { width: 360px; height: 360px; background: radial-gradient(circle, #38BDF8, transparent 70%); bottom: 5%; left: -100px; animation-delay: -6s; opacity: 0.22; }
+.orb-3 { width: 280px; height: 280px; background: radial-gradient(circle, #34D399, transparent 70%); top: 45%; right: 20%; animation-delay: -11s; opacity: 0.14; }
+
+@keyframes gridDrift {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(48px, 48px, 0); }
+}
+@keyframes floatOrb {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, -25px) scale(1.08); }
+  100% { transform: translate(-20px, 20px) scale(0.95); }
+}
+
+/* ===== Cinematic Preloader (1.4s) ===== */
+#loader {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: radial-gradient(circle at 50% 45%, #0F1A2E 0%, #070B14 75%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  animation: loaderOut 0.55s cubic-bezier(0.22, 1, 0.36, 1) 1.35s forwards;
+}
+#loader.done { display: none; }
+.loader-logo-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 112px;
+}
+.loader-logo-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(94, 162, 255, 0.28), transparent 70%);
+  animation: pulseGlow 1.4s ease-in-out infinite;
+}
+#loader svg { width: 72px; height: 96px; filter: drop-shadow(0 0 14px rgba(94, 162, 255, 0.5)); }
+#loader .ld-frame {
+  stroke-dasharray: 260;
+  stroke-dashoffset: 260;
+  animation: drawPath 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.05s forwards;
+}
+#loader .ld-pulse {
+  stroke-dasharray: 120;
+  stroke-dashoffset: 120;
+  animation: drawPath 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.35s forwards;
+}
+.loader-title {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: fadeUp 0.5s ease 0.25s forwards;
+}
+.loader-title span { color: var(--accent); }
+.loader-bar-track {
+  width: 210px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+  opacity: 0;
+  animation: fadeUp 0.4s ease 0.3s forwards;
+}
+.loader-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--cyan), var(--emerald));
+  border-radius: 999px;
+  animation: fillBar 1.1s cubic-bezier(0.4, 0, 0.2, 1) 0.2s forwards;
+}
+.loader-sub {
+  font-size: 13px;
+  color: var(--muted);
+  opacity: 0;
+  animation: fadeUp 0.4s ease 0.35s forwards;
+}
+
+@keyframes drawPath { to { stroke-dashoffset: 0; } }
+@keyframes fillBar { to { width: 100%; } }
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(0.95); opacity: 0.6; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+@keyframes loaderOut {
+  0% { opacity: 1; transform: scale(1); filter: blur(0); }
+  100% { opacity: 0; transform: scale(1.03); filter: blur(8px); visibility: hidden; pointer-events: none; }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Layout Shell ===== */
+.shell {
+  width: 100%;
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 16px 18px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  flex: 1;
+}
+
+/* ===== Sticky Glassmorphic Header ===== */
+header {
+  position: sticky;
+  top: 12px;
+  z-index: 40;
+  background: rgba(11, 17, 30, 0.78);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  animation: fadeDown 0.65s cubic-bezier(0.22, 1, 0.36, 1) 1.3s both;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+}
+.logo svg { transition: transform 0.25s ease; }
+.logo:hover svg { transform: scale(1.06); }
+.logo:hover .pl { stroke-dasharray: 100; animation: blip 0.8s ease; }
+@keyframes blip { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+.brand { font-size: 20px; font-weight: 700; letter-spacing: -0.4px; }
+.brand em { font-style: normal; color: var(--accent); }
+
+nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+nav::-webkit-scrollbar { display: none; }
+nav a.tab {
+  position: relative;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  text-decoration: none;
+  transition: color 0.2s, background 0.2s;
+  cursor: pointer;
+}
+nav a.tab:hover { color: var(--text); background: rgba(94, 162, 255, 0.08); }
+nav a.tab[aria-current="page"] {
+  color: var(--text);
+  background: rgba(94, 162, 255, 0.14);
+}
+nav a.tab[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 14px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--cyan));
+  box-shadow: 0 0 8px var(--accent);
+}
+nav a.tab small {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(94, 162, 255, 0.15);
+  color: var(--cyan);
+  margin-inline-start: 6px;
+}
+
+.acctwrap { position: relative; margin-inline-start: auto; }
+.acct {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(26, 36, 56, 0.7);
+  border: 1px solid var(--line);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s, background 0.2s;
+}
+.acct:hover { transform: rotate(-8deg) scale(1.06); border-color: var(--accent); background: rgba(94, 162, 255, 0.15); }
+.menu {
+  position: absolute;
+  inset-inline-end: 0;
+  top: calc(100% + 10px);
+  min-width: 195px;
+  background: rgba(15, 23, 40, 0.95);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  padding: 6px;
+  z-index: 50;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  animation: fadeUp 0.2s ease both;
+}
+.menu button {
+  display: block;
+  width: 100%;
+  text-align: start;
+  border: 0;
+  background: transparent;
+  min-height: 40px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.menu button:hover { background: rgba(94, 162, 255, 0.14); }
+
+/* ===== Views & Page Transitions ===== */
+.view { display: none; flex-direction: column; gap: 16px; }
+.view.active {
+  display: flex;
+  animation: viewIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes viewIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Typography & Common Controls ===== */
+h1 { font-size: clamp(22px, 3vw, 28px); font-weight: 700; margin: 0; letter-spacing: -0.3px; }
+.h2, .gh { font-size: 16px; font-weight: 600; color: var(--muted); margin: 6px 0 0; letter-spacing: -0.2px; }
+.note { color: var(--muted); font-size: 14px; line-height: 1.75; margin: 0; }
+.sub { color: var(--muted); font-size: 13.5px; margin: 0; }
+.err { color: var(--bad); min-height: 20px; font-size: 14.5px; line-height: 1.7; }
+
+button, select, input.cmd {
+  font: inherit;
+  font-size: 14.5px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(94, 162, 255, 0.22);
+  background: rgba(20, 30, 50, 0.8);
+  color: var(--text);
+  padding: 9px 16px;
+  min-height: 44px;
+  transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+button { cursor: pointer; font-weight: 500; }
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: rgba(30, 44, 72, 0.95);
+  border-color: var(--accent);
+  box-shadow: 0 6px 18px rgba(94, 162, 255, 0.14);
+}
+button:active:not(:disabled) { transform: scale(0.97); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.main {
+  background: linear-gradient(135deg, var(--accent), #3B82F6);
+  border-color: var(--accent);
+  color: var(--ink);
+  font-weight: 700;
+  padding: 9px 22px;
+  box-shadow: 0 4px 16px rgba(94, 162, 255, 0.28);
+}
+button.main:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7DB4FF, var(--accent));
+  box-shadow: 0 8px 24px rgba(94, 162, 255, 0.4);
+}
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+.status-pill {
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 40, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--muted);
+}
+.status-pill::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64748B;
+}
+.status-pill.on {
+  color: var(--emerald);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+.status-pill.on::before {
+  background: var(--emerald);
+  animation: pulseDot 1.6s ease infinite;
+}
+@keyframes pulseDot {
+  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.65); }
+  70% { box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+
+/* ===== Home Hero & Bento Grid ===== */
+.hero {
+  text-align: center;
+  padding: 40px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(94, 162, 255, 0.1);
+  border: 1px solid rgba(94, 162, 255, 0.28);
+  color: var(--cyan);
+  font-size: 13px;
+  font-weight: 600;
+}
+.hero-badge .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cyan);
+  animation: pulseDot 1.8s infinite;
+}
+.hero h1 {
+  font-size: clamp(28px, 5vw, 46px);
+  line-height: 1.28;
+  background: linear-gradient(180deg, #FFFFFF 20%, #A5C4F3 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero p {
+  margin: 0;
+  font-size: 17.5px;
+  line-height: 1.8;
+  color: var(--muted);
+  max-width: 650px;
+}
+.cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 4px; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 10px 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: rgba(20, 30, 50, 0.8);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.18s, border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.btn:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: var(--shadow-glow); }
+.btn.main {
+  background: linear-gradient(135deg, var(--accent), #3B82F6);
+  border-color: var(--accent);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 14px;
+}
+.card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px;
+  background: var(--card);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s, box-shadow 0.25s;
+}
+.card:not(.soon):hover {
+  transform: translateY(-5px);
+  border-color: var(--accent);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4), 0 0 24px rgba(94, 162, 255, 0.16);
+}
+.card-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: rgba(94, 162, 255, 0.12);
+  border: 1px solid rgba(94, 162, 255, 0.25);
+  color: var(--accent);
+}
+.card h2 { margin: 0; font-size: 19px; font-weight: 700; }
+.card p { margin: 0; color: var(--muted); line-height: 1.75; font-size: 14.5px; }
+.card .tag {
+  align-self: flex-start;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: var(--cyan);
+}
+.card.soon { border-style: dashed; opacity: 0.78; cursor: default; }
+
+/* ===== Interactive Step Checklists ===== */
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+button.step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 62px;
+  text-align: start;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+button.step:hover { border-color: var(--accent); transform: translateY(-2px); }
+.step .num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: var(--accent);
+  font: 700 15px var(--font-mono);
+  transition: background 0.25s, color 0.25s;
+}
+.step .chk {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--emerald);
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.25s, transform 0.25s;
+}
+.step.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(94, 162, 255, 0.35), 0 8px 20px rgba(94, 162, 255, 0.12);
+}
+.step.active .num { background: var(--accent); color: var(--ink); }
+.step.done { border-color: rgba(52, 211, 153, 0.45); background: rgba(16, 42, 38, 0.55); }
+.step.done .num { background: var(--emerald); border-color: var(--emerald); color: var(--ink); }
+.step.done .chk { opacity: 1; transform: scale(1); }
+
+/* ===== Terminal / Log Views ===== */
+.logbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.logbar .grow { flex: 1; }
+.logbar button { min-height: 38px; padding: 6px 14px; font-size: 13.5px; }
+
+.terminal {
+  direction: ltr;
+  text-align: left;
+  background: #060A12;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  height: clamp(180px, 30vh, 290px);
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font: 12.5px/1.55 var(--font-mono);
+  margin: 0;
+  color: #D6E4FF;
+  box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.5);
+  transition: height 0.25s ease;
+}
+.terminal.big { height: 64vh; }
+.terminal:empty::before {
+  content: attr(data-empty);
+  display: block;
+  text-align: center;
+  padding-top: 56px;
+  color: var(--muted);
+  direction: rtl;
+  font: 14.5px var(--font-sans);
+}
+
+/* ===== Data Grids & Cards ===== */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+button.row {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  text-align: start;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: var(--radius-md);
+  color: var(--text);
+}
+button.row:disabled { opacity: 1; cursor: default; }
+button.row:hover:not(:disabled) { border-color: var(--accent); transform: translateY(-2px); }
+.row .k { display: block; color: var(--muted); font-size: 12.5px; margin-bottom: 4px; }
+.row .v { display: block; font: 15px var(--font-mono); direction: ltr; text-align: right; word-break: break-all; }
+.row .v.na { color: var(--muted); font-family: inherit; direction: rtl; }
+
+.empty-box {
+  padding: 24px;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  font-size: 14.5px;
+}
+
+/* ===== Thermal Cards ===== */
+.chk2 { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14.5px; min-height: 44px; cursor: pointer; }
+.chk2 input { width: 18px; height: 18px; accent-color: var(--accent); }
+.tgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.tc {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tc .k { color: var(--muted); font-size: 13px; }
+.tc .v { font: 700 21px var(--font-mono); direction: ltr; text-align: right; }
+.tc .v.ok { color: var(--emerald); }
+.tc .v.warn { color: var(--amber); }
+.tc .v.hot { color: var(--orange); }
+.tc .v.crit { color: var(--bad); }
+.lvl { align-self: flex-start; font: 600 12px var(--font-sans); padding: 2px 9px; border-radius: 999px; }
+.lvl.ok { background: rgba(52, 211, 153, 0.14); color: var(--emerald); }
+.lvl.warn { background: rgba(251, 191, 36, 0.14); color: var(--amber); }
+.lvl.hot { background: rgba(251, 146, 60, 0.14); color: var(--orange); }
+.lvl.crit { background: rgba(248, 113, 113, 0.14); color: var(--bad); }
+
+.advice {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  line-height: 1.8;
+  font-size: 14.5px;
+}
+.advice.ok { border-color: rgba(52, 211, 153, 0.45); }
+.advice.warn { border-color: rgba(251, 191, 36, 0.45); }
+.advice.crit { border-color: rgba(248, 113, 113, 0.45); }
+
+/* ===== Analysis Tabs ===== */
+.panel-box {
+  background: var(--card);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+.tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 12px; }
+.tabs .grow { flex: 1; }
+[role="tab"] { min-height: 40px; }
+[role="tab"][aria-selected="true"] {
+  background: var(--accent);
+  color: var(--ink);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+#findings, #suggestions { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+#findings li, #suggestions li {
+  border: 1px solid var(--line);
+  background: rgba(10, 15, 26, 0.6);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+#findings code {
+  display: block;
+  direction: ltr;
+  text-align: left;
+  color: var(--muted);
+  font: 12px/1.5 var(--font-mono);
+  word-break: break-all;
+  margin-top: 6px;
+}
+
+/* ===== Fastboot Danger Zone & Custom Modal ===== */
+input.cmd {
+  flex: 1;
+  min-width: 220px;
+  direction: ltr;
+  text-align: left;
+  font: 14px var(--font-mono);
+}
+.danger { border-color: rgba(248, 113, 113, 0.5); color: var(--bad); }
+.danger:hover:not(:disabled) { background: rgba(248, 113, 113, 0.14); border-color: var(--bad) !important; }
+details.dz {
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(40, 14, 18, 0.35);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+details.dz summary { cursor: pointer; color: var(--bad); font-weight: 600; }
+details.dz .bar { margin-top: 10px; background: transparent; border: 0; padding: 0; }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(4, 8, 16, 0.78);
+  backdrop-filter: blur(8px);
+  display: none;
+  place-items: center;
+  padding: 16px;
+  overscroll-behavior: contain;
+}
+.modal-backdrop.open { display: grid; animation: fadeUp 0.2s ease both; }
+.modal-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-elevated);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.modal-card h3 { margin: 0; color: var(--bad); font-size: 18px; }
+.modal-card p { margin: 0; color: var(--muted); font-size: 14.5px; line-height: 1.75; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+
+/* ===== Custom Pop-up Selector (SoC & Baud) ===== */
+.picker-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 170px;
+  background: rgba(20, 30, 50, 0.85);
+  border: 1px solid rgba(94, 162, 255, 0.28);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  min-height: 44px;
+  color: var(--text);
+  cursor: pointer;
+}
+.picker-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: rgba(30, 44, 72, 0.95);
+  box-shadow: 0 6px 18px rgba(94, 162, 255, 0.16);
+}
+.picker-btn .p-val { font-weight: 600; font-size: 14px; }
+.picker-btn .p-icon { color: var(--accent); opacity: 0.85; flex: none; }
+
+.select-modal-card {
+  width: 100%;
+  max-width: 540px;
+  background: rgba(13, 19, 34, 0.94);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.7), 0 0 40px rgba(94, 162, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: popScale 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes popScale {
+  from { opacity: 0; transform: scale(0.94) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.select-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.select-modal-head h3 { margin: 0; font-size: 18px; color: var(--text); }
+.select-close {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+}
+.select-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+  max-height: 60vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px;
+}
+.select-grid.baud-grid {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+.opt-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  text-align: start;
+  padding: 12px 14px;
+  background: rgba(20, 30, 50, 0.7);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  cursor: pointer;
+  position: relative;
+}
+.opt-card:hover {
+  border-color: var(--accent);
+  background: rgba(30, 44, 72, 0.9);
+  transform: translateY(-2px);
+}
+.opt-card.selected {
+  border-color: var(--emerald);
+  background: rgba(16, 42, 38, 0.55);
+  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.35);
+}
+.opt-card .opt-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+}
+.opt-card .opt-title { font-weight: 700; font-size: 14.5px; }
+.opt-card .opt-baud {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(94, 162, 255, 0.14);
+  color: var(--cyan);
+}
+.opt-card .opt-hint { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.opt-card.baud-opt {
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  min-height: 54px;
+}
+
+/* ===== Toast & Footer ===== */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  inset-inline: 0;
+  margin: auto;
+  width: max-content;
+  max-width: 90vw;
+  background: rgba(15, 23, 40, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 14.5px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none;
+  z-index: 400;
+}
+#toast.show { opacity: 1; transform: translateY(0); }
+
+footer {
+  margin-top: auto;
+  padding: 20px 0 6px;
+  text-align: center;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  border-top: 1px solid var(--line);
+}
+footer b { color: var(--text); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  #loader { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Ambient Background -->
+<div class="ambient-bg" aria-hidden="true">
+  <div class="cyber-grid"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<!-- Cinematic Preloader -->
+<div id="loader" aria-hidden="true">
+  <div class="loader-logo-wrap">
+    <svg viewBox="0 0 60 84" xmlns="http://www.w3.org/2000/svg">
+      <rect class="ld-frame" x="6" y="4" width="48" height="76" rx="9" fill="none" stroke="#5EA2FF" stroke-width="4"/>
+      <line x1="24" y1="12" x2="36" y2="12" stroke="#5EA2FF" stroke-width="3" stroke-linecap="round"/>
+      <polyline class="ld-pulse" pathLength="100" points="13,46 22,46 27,28 34,64 39,46 47,46" fill="none" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="24" y1="72" x2="36" y2="72" stroke="#5EA2FF" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="loader-title" dir="ltr">Muhammad <span>El Khwaga</span></div>
+  <div class="loader-bar-track"><div class="loader-bar-fill"></div></div>
+  <div class="loader-sub">جارٍ تهيئة أدوات التشخيص...</div>
+</div>
+
+<div class="shell">
+  <!-- Sticky Glassmorphic Header -->
+  <header>
+    <a class="logo" data-nav="home" aria-label="الرئيسية">
+      <svg width="26" height="36" viewBox="0 0 60 84" role="img" aria-hidden="true">
+        <rect x="6" y="4" width="48" height="76" rx="9" fill="none" stroke="#5EA2FF" stroke-width="4"/>
+        <line x1="24" y1="12" x2="36" y2="12" stroke="#5EA2FF" stroke-width="3" stroke-linecap="round"/>
+        <polyline class="pl" pathLength="100" points="13,46 22,46 27,28 34,64 39,46 47,46" fill="none" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="24" y1="72" x2="36" y2="72" stroke="#5EA2FF" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <span class="brand" dir="ltr">Muhammad <em>El Khwaga</em></span>
+    </a>
+
+    <nav aria-label="الصفحات">
+      <a class="tab" data-nav="home" aria-current="page">الرئيسية</a>
+      <a class="tab" data-nav="uart">قارئ UART</a>
+      <a class="tab" data-nav="adb">معلومات ADB</a>
+      <a class="tab" data-nav="fastboot">Fastboot</a>
+      <a class="tab" href="#" data-toast="الدورة ستتوفر قريباً">الدورة <small>قريباً</small></a>
+    </nav>
+
+    <div class="acctwrap">
+      <button class="acct" id="acct-btn" aria-label="الحساب" aria-haspopup="menu" aria-expanded="false">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>
+        </svg>
+      </button>
+      <div class="menu" id="acct-menu" role="menu" hidden>
+        <button role="menuitem" data-toast="تسجيل الدخول سيتوفر قريباً">تسجيل الدخول</button>
+        <button role="menuitem" data-toast="إنشاء الحساب سيتوفر قريباً">إنشاء حساب</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== HOME VIEW ==================== -->
+  <main id="view-home" class="view active">
+    <section class="hero">
+      <div class="hero-badge"><span class="dot"></span><span>يعمل مباشرة من المتصفح بدون تثبيت</span></div>
+      <h1>شخّص أعطال الهواتف بدقة واحترافية</h1>
+      <p>اقرأ سجل UART، ونفّذ أوامر ADB وFastboot، وراقب حرارة الهاتف ومعلوماته الأساسية، كل ذلك في متصفحك مع خصوصية كاملة.</p>
+      <div class="cta">
+        <button class="btn main" data-nav="adb">ابدأ بقراءة معلومات الهاتف</button>
+        <button class="btn" data-nav="uart">قارئ سجل UART</button>
+      </div>
+    </section>
+
+    <div class="cards">
+      <a class="card" data-nav="uart">
+        <div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
+        <h2>قارئ سجل UART</h2>
+        <p>اقرأ سجل الهاتف عبر محوّل USB-TTL، مع سرعات النقل المقترحة حسب المعالج وتحليل مبدئي للأخطاء.</p>
+      </a>
+      <a class="card" data-nav="adb">
+        <div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></div>
+        <h2>معلومات الهاتف (ADB)</h2>
+        <p>الموديل وإصدار أندرويد وBaseband وIMEI وعناوين MAC، مع قراءة الحرارة وسجلات Wi-Fi وBluetooth والشبكة.</p>
+      </a>
+      <a class="card" data-nav="fastboot">
+        <div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+        <h2>Fastboot</h2>
+        <p>معلومات الجهاز وحالة Bootloader وأوامر Fastboot العامة وإدارة الفتحات A/B.</p>
+      </a>
+      <div class="card soon">
+        <span class="tag">قريباً</span>
+        <h2>ADB اللاسلكي</h2>
+        <p>الاتصال بالهاتف لاسلكياً عبر شبكة Wi-Fi دون الحاجة لكابل.</p>
+      </div>
+      <div class="card soon">
+        <span class="tag">قريباً</span>
+        <h2>تحليل بالذكاء الاصطناعي</h2>
+        <p>حفظ السجلات في حسابك وتحليلها آلياً مع اقتراح حلول صيانة جاهزة.</p>
+      </div>
+      <div class="card soon">
+        <span class="tag">قريباً</span>
+        <h2>الدورة التدريبية</h2>
+        <p>دورة شاملة لتعلّم تشخيص وصيانة الهواتف خطوة بخطوة.</p>
+      </div>
+    </div>
+
+    <p class="note" style="text-align:center;">يعمل الموقع على متصفحي Chrome وEdge فقط. معلومات الهاتف تظهر في متصفحك ولا تُرفع إلى أي خادم.</p>
+  </main>
+
+  <!-- ==================== UART VIEW ==================== -->
+  <section id="view-uart" class="view">
+    <h1>قارئ سجل UART</h1>
+    <ol class="steps" id="uart-steps" aria-label="الخطوات">
+      <li><button class="step active" data-step><span class="num">1</span><span>وصّل محوّل TTL بالهاتف</span><svg class="chk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg></button></li>
+      <li><button class="step" data-step><span class="num">2</span><span>اختر معالج الهاتف (SoC)</span><svg class="chk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg></button></li>
+      <li><button class="step" data-step><span class="num">3</span><span>تأكد من سرعة النقل (115200)</span><svg class="chk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg></button></li>
+      <li><button class="step" data-step-connect="u-connect"><span class="num">4</span><span>اضغط «اتصال» واختر المنفذ</span><svg class="chk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg></button></li>
+    </ol>
+
+    <div class="bar">
+      <label>المعالج (SoC)</label>
+      <button type="button" id="u-soc-btn" class="picker-btn" aria-haspopup="dialog">
+        <span class="p-val" id="u-soc-label">— اختر المعالج —</span>
+        <svg class="p-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg>
+      </button>
+      <label>سرعة النقل</label>
+      <button type="button" id="u-baud-btn" class="picker-btn" style="min-width:130px;" aria-haspopup="dialog">
+        <span class="p-val" id="u-baud-label" style="font-family:var(--font-mono);">115200</span>
+        <svg class="p-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </button>
+      <button id="u-connect" class="main">اتصال</button>
+      <button id="u-disconnect" disabled>قطع الاتصال</button>
+      <span id="u-status" class="status-pill" role="status">غير متصل</span>
+    </div>
+    <div id="u-socbar" class="bar" hidden>
+      <span id="u-baudhint" class="note"></span>
+      <button id="u-usebaud" hidden>استخدم السرعة المقترحة</button>
+    </div>
+    <div id="u-err" class="err" role="alert"></div>
+
+    <div class="logbar">
+      <strong>السجل المباشر</strong>
+      <span class="grow"></span>
+      <button id="u-copy">نسخ</button>
+      <button id="u-save">حفظ</button>
+      <button id="u-clear">مسح</button>
+      <button id="u-expand">تكبير</button>
+    </div>
+    <pre id="u-log" class="terminal" tabindex="0" data-empty="لا يوجد سجل بعد. وصّل المحوّل ثم اضغط «اتصال»."></pre>
+
+    <div class="panel-box">
+      <h2 class="h2" style="margin-top:0;color:var(--text);">التحليل والاقتراحات</h2>
+      <div class="tabs" role="tablist">
+        <button id="u-tab-an" role="tab" aria-selected="true">التحليل</button>
+        <button id="u-tab-sg" role="tab" aria-selected="false">الاقتراحات</button>
+        <span class="grow"></span>
+        <button id="u-analyze" class="main">حلّل السجل</button>
+        <button id="u-copyai">انسخ للذكاء الاصطناعي</button>
+      </div>
+      <div id="u-summary" class="note" style="margin-bottom:10px;">اقرأ السجل ثم اضغط «حلّل السجل». يتم التحليل تلقائياً عند قطع الاتصال.</div>
+      <div id="u-panel-an"><ul id="u-findings"></ul></div>
+      <div id="u-panel-sg" hidden><ul id="u-suggestions"></ul></div>
+    </div>
+  </section>
+
+  <!-- ==================== ADB VIEW ==================== -->
+  <section id="view-adb" class="view">
+    <h1>معلومات الهاتف (ADB)</h1>
+    <div class="bar">
+      <button id="a-connect" class="main">اتصال بالهاتف</button>
+      <button id="a-disconnect" disabled>قطع الاتصال</button>
+      <button id="a-copy" disabled>نسخ المعلومات</button>
+      <span id="a-status" class="status-pill" role="status">غير متصل</span>
+    </div>
+    <div id="a-err" class="err" role="alert"></div>
+
+    <ol class="steps" id="adb-steps" aria-label="الخطوات">
+      <li><button class="step active" data-step><span class="num">1</span><span>فعّل «تصحيح USB» في الهاتف</span><svg class="chk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg></button></li>
+      <li><button class="step" data-step><span class="num">2</span><span>وصّل الهاتف بكابل USB</span><svg class="chk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg></button></li>
+      <li><button class="step" data-step-connect="a-connect"><span class="num">3</span><span>اضغط «اتصال» ووافق على الرسالة</span><svg class="chk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg></button></li>
+    </ol>
+    <p class="note">إذا كان ADB يعمل على الكمبيوتر أوقفه بالأمر <code style="direction:ltr;">adb kill-server</code>. اضغط على أي معلومة لنسخها.</p>
+
+    <div id="a-info"><p class="empty-box">لا توجد معلومات بعد. وصّل الهاتف ثم اضغط «اتصال بالهاتف».</p></div>
+
+    <h2 class="h2">الحرارة</h2>
+    <div class="bar">
+      <button id="a-tread" class="a-tg" disabled>قراءة الحرارة</button>
+      <label class="chk2"><input type="checkbox" id="a-tauto" disabled> تحديث تلقائي كل 5 ثوانٍ</label>
+      <span id="a-tstatus" class="note" style="margin-inline-start:auto;"></span>
+    </div>
+    <div id="a-thermal"><p class="empty-box">اضغط «قراءة الحرارة» بعد الاتصال بالهاتف.</p></div>
+
+    <h2 class="h2">السجلات (Logcat)</h2>
+    <div class="bar">
+      <button class="a-lg" data-k="wifi" disabled>سجل Wi-Fi</button>
+      <button class="a-lg" data-k="bt" disabled>سجل Bluetooth</button>
+      <button class="a-lg" data-k="cell" disabled>سجل الشبكة الخلوية</button>
+      <button class="a-lg" data-k="thermal" disabled>سجل الحرارة</button>
+      <button id="a-lcopy" disabled>نسخ</button>
+      <button id="a-lsave" disabled>حفظ</button>
+      <button id="a-lexpand">تكبير</button>
+      <span id="a-lstatus" class="note" style="margin-inline-start:auto;"></span>
+    </div>
+    <pre id="a-logview" class="terminal" tabindex="0" data-empty="اختر نوع السجل من الأزرار بالأعلى بعد الاتصال بالهاتف."></pre>
+  </section>
+
+  <!-- ==================== FASTBOOT VIEW ==================== -->
+  <section id="view-fastboot" class="view">
+    <h1>Fastboot</h1>
+    <ol class="steps" id="fb-steps" aria-label="الخطوات">
+      <li><button class="step active" data-step><span class="num">1</span><span>أدخل الهاتف في وضع Bootloader</span><svg class="chk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg></button></li>
+      <li><button class="step" data-step><span class="num">2</span><span>وصّل الهاتف بكابل USB</span><svg class="chk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg></button></li>
+      <li><button class="step" data-step-connect="f-connect"><span class="num">3</span><span>اضغط «اتصال بالهاتف»</span><svg class="chk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg></button></li>
+    </ol>
+    <p class="note">على ويندوز قد تحتاج تعريف WinUSB. المعلومات تظهر هنا فقط ولا تُرفع إلى أي خادم.</p>
+
+    <div class="bar">
+      <button id="f-connect" class="main">اتصال بالهاتف</button>
+      <button id="f-disconnect" disabled>قطع الاتصال</button>
+      <span id="f-status" class="status-pill" role="status">غير متصل</span>
+    </div>
+    <div id="f-err" class="err" role="alert"></div>
+
+    <h2 class="h2">معلومات الجهاز وحالة Bootloader</h2>
+    <div class="bar"><button id="f-inforead" class="f-tg" disabled>قراءة المعلومات</button></div>
+    <div id="f-info"><p class="empty-box">اتصل بالهاتف في وضع Fastboot لقراءة المعلومات.</p></div>
+
+    <h2 class="h2">أوامر عامة</h2>
+    <div class="bar">
+      <button class="f-tg" data-act="reboot" disabled>إعادة تشغيل النظام</button>
+      <button class="f-tg" data-act="bootloader" disabled>إعادة تشغيل إلى Bootloader</button>
+      <button class="f-tg" data-act="recovery" disabled>Recovery</button>
+      <button class="f-tg" data-act="fastboot" disabled>fastbootd</button>
+      <button class="f-tg" data-cmd="getvar:all" disabled>getvar all</button>
+      <button class="f-tg" data-cmd="oem device-info" disabled>oem device-info</button>
+    </div>
+    <div id="f-slotbar" class="bar" hidden>
+      <span class="sub">الفتحة النشطة (A/B):</span>
+      <button class="f-tg" data-cmd="set_active:a" disabled>تفعيل A</button>
+      <button class="f-tg" data-cmd="set_active:b" disabled>تفعيل B</button>
+    </div>
+    <div class="bar">
+      <input id="f-cmd" class="cmd" type="text" placeholder="أمر مخصص مثل: getvar:product" aria-label="أمر مخصص" disabled>
+      <button id="f-run" class="f-tg" disabled>نفّذ</button>
+    </div>
+
+    <details class="dz">
+      <summary>أوامر خطرة (تمسح بيانات أو تغيّر حماية الهاتف)</summary>
+      <div class="bar">
+        <button class="f-tg danger" data-danger="unlock" disabled>فتح Bootloader</button>
+        <button class="f-tg danger" data-danger="lock" disabled>قفل Bootloader</button>
+        <button class="f-tg danger" data-danger="erase" disabled>مسح بيانات المستخدم</button>
+      </div>
+    </details>
+
+    <div class="logbar">
+      <strong>النتيجة</strong>
+      <span class="grow"></span>
+      <button id="f-lcopy" disabled>نسخ</button>
+      <button id="f-lsave" disabled>حفظ</button>
+      <button id="f-lclear" disabled>مسح</button>
+      <button id="f-lexpand">تكبير</button>
+    </div>
+    <pre id="f-logview" class="terminal" tabindex="0" data-empty="ستظهر نتيجة الأوامر هنا."></pre>
+  </section>
+
+  <footer>تم البناء بواسطة <b dir="ltr">Osman</b></footer>
+</div>
+
+<!-- Custom Confirmation Modal (Replaces native confirm/prompt) -->
+<div id="confirm-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal-card">
+    <h3 id="modal-title">تأكيد إجراء خطر</h3>
+    <p id="modal-msg"></p>
+    <div class="modal-actions">
+      <button id="modal-cancel">إلغاء</button>
+      <button id="modal-ok" class="danger">تأكيد التنفيذ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pop-up Selector Modal (SoC & Baud) -->
+<div id="select-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="select-modal-title">
+  <div class="select-modal-card">
+    <div class="select-modal-head">
+      <h3 id="select-modal-title">اختر</h3>
+      <button type="button" id="select-modal-close" class="select-close" aria-label="إغلاق">✕</button>
+    </div>
+    <div id="select-modal-grid" class="select-grid"></div>
+  </div>
+</div>
+
+<!-- Toast Notification -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+// ===== Core UI: Preloader, Navigation, Toast, Account Menu, Steps =====
+(() => {
+  const loader = document.getElementById('loader');
+  setTimeout(() => loader.classList.add('done'), 1950);
+
+  const toastEl = document.getElementById('toast');
+  let toastTimer;
+  window.toast = msg => {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2400);
+  };
+
+  // Clipboard helper with iFrame fallback
+  window.copyText = async (str) => {
+    try {
+      await navigator.clipboard.writeText(str);
+      return true;
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = str;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    }
+  };
+
+  // SPA Navigation
+  const views = {
+    home: document.getElementById('view-home'),
+    uart: document.getElementById('view-uart'),
+    adb: document.getElementById('view-adb'),
+    fastboot: document.getElementById('view-fastboot')
+  };
+  const navLinks = document.querySelectorAll('nav a.tab[data-nav]');
+  function switchView(name) {
+    if (!views[name]) return;
+    Object.entries(views).forEach(([k, el]) => el.classList.toggle('active', k === name));
+    navLinks.forEach(a => a.setAttribute('aria-current', a.dataset.nav === name ? 'page' : 'false'));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  document.querySelectorAll('[data-nav]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      switchView(el.dataset.nav);
+    });
+  });
+
+  // Account Dropdown
+  const acctBtn = document.getElementById('acct-btn');
+  const acctMenu = document.getElementById('acct-menu');
+  const closeMenu = () => { acctMenu.hidden = true; acctBtn.setAttribute('aria-expanded', 'false'); };
+  acctBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const open = acctMenu.hidden;
+    acctMenu.hidden = !open;
+    acctBtn.setAttribute('aria-expanded', String(open));
+  });
+  document.addEventListener('click', closeMenu);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+  document.querySelectorAll('[data-toast]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      window.toast(el.dataset.toast);
+      closeMenu();
+    });
+  });
+
+  // Interactive Step Checklists
+  document.querySelectorAll('.steps').forEach(list => {
+    const steps = [...list.querySelectorAll('.step')];
+    const refresh = () => {
+      const first = steps.find(s => !s.classList.contains('done'));
+      steps.forEach(s => s.classList.toggle('active', s === first));
+    };
+    steps.forEach(s => {
+      s.addEventListener('click', () => {
+        if (s.dataset.stepConnect) {
+          const btn = document.getElementById(s.dataset.stepConnect);
+          if (btn && !btn.disabled) btn.click();
+          return;
+        }
+        s.classList.toggle('done');
+        refresh();
+      });
+    });
+    refresh();
+  });
+
+  // Custom Modal Helper
+  const modal = document.getElementById('confirm-modal');
+  const modalMsg = document.getElementById('modal-msg');
+  const modalOk = document.getElementById('modal-ok');
+  const modalCancel = document.getElementById('modal-cancel');
+  window.lockScroll = on => {
+    document.documentElement.classList.toggle('modal-open', on);
+    document.body.classList.toggle('modal-open', on);
+  };
+  window.askConfirm = msg => new Promise(resolve => {
+    modalMsg.textContent = msg;
+    modal.classList.add('open');
+    window.lockScroll(true);
+    const cleanup = res => {
+      modal.classList.remove('open');
+      window.lockScroll(false);
+      modalOk.onclick = null;
+      modalCancel.onclick = null;
+      resolve(res);
+    };
+    modalOk.onclick = () => cleanup(true);
+    modalCancel.onclick = () => cleanup(false);
+  });
+})();
+
+// ===== UART READER LOGIC =====
+(() => {
+  const $ = id => document.getElementById(id);
+  const logEl = $('u-log'), errEl = $('u-err'), statusEl = $('u-status');
+  const MAX = 2000000;
+  let port = null, reader = null, keepReading = false, text = '', queued = false, atBottom = true;
+  let currentSoc = '', currentBaud = '115200';
+
+  const SOC_OPTIONS = [
+    { id: 'qualcomm', name: 'Qualcomm Snapdragon', baud: '115200', note: 'سنابدراجون: 115200 هي سرعة كونسول UART في وثائق كوالكوم.' },
+    { id: 'mediatek', name: 'MediaTek', baud: '921600', note: 'ميديا تك: حسب وثائق ميديا تك الـBootloader والـKernel على 921600، والـBoot ROM على 115200.' },
+    { id: 'exynos', name: 'Samsung Exynos', baud: '115200', note: 'Exynos: 115200 في هواتف سامسونج الموثقة. بعض خطوط UART بجهد 1.8V، تأكد أن المحوّل يدعم ذلك.' },
+    { id: 'unisoc', name: 'Unisoc (Spreadtrum)', baud: '115200', note: 'Unisoc: 115200 هو الإعداد القياسي للنواة.' },
+    { id: 'kirin', name: 'HiSilicon Kirin', baud: '115200', note: 'Kirin: 115200 قياسي، وبعض أدوات الاسترداد قد تستخدم سرعات أعلى.' },
+    { id: 'other', name: 'معالج آخر / لا أعرف', baud: '', note: 'ابدأ بـ 115200 ثم جرّب السرعات الأخرى إذا ظهر نص مشوّه.' }
+  ];
+  const BAUD_OPTIONS = ['9600', '57600', '115200', '230400', '460800', '921600', '1500000'];
+
+  if (!('serial' in navigator)) {
+    errEl.textContent = 'هذا المتصفح لا يدعم Web Serial. استخدم Chrome أو Edge.';
+    $('u-connect').disabled = true;
+  }
+
+  logEl.addEventListener('scroll', () => {
+    atBottom = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 20;
+  });
+
+  function render() {
+    queued = false;
+    logEl.textContent = text;
+    if (atBottom) logEl.scrollTop = logEl.scrollHeight;
+  }
+  function append(s) {
+    text += s;
+    if (text.length > MAX) text = text.slice(-MAX);
+    if (!queued) { queued = true; requestAnimationFrame(render); }
+  }
+  function setState(on) {
+    $('u-connect').disabled = on;
+    $('u-disconnect').disabled = !on;
+    $('u-baud-btn').disabled = on;
+    $('u-soc-btn').disabled = on;
+    statusEl.className = on ? 'status-pill on' : 'status-pill';
+    statusEl.textContent = on ? 'متصل بسرعة ' + currentBaud : 'غير متصل';
+  }
+
+  async function connect() {
+    errEl.textContent = '';
+    try {
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate: Number(currentBaud) });
+    } catch (e) {
+      if (e.name !== 'NotFoundError') errEl.textContent = 'تعذّر الاتصال: ' + e.message;
+      port = null;
+      return;
+    }
+    keepReading = true;
+    setState(true);
+    toast('تم الاتصال بمنفذ UART');
+    readLoop();
+  }
+
+  async function readLoop() {
+    const dec = new TextDecoder();
+    while (port && port.readable && keepReading) {
+      reader = port.readable.getReader();
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value) append(dec.decode(value, { stream: true }));
+        }
+      } catch (e) {
+        errEl.textContent = 'انقطعت القراءة: ' + e.message;
+        keepReading = false;
+      } finally {
+        reader.releaseLock();
+        reader = null;
+      }
+    }
+    try { await port.close(); } catch {}
+    port = null;
+    setState(false);
+    toast('تم قطع الاتصال');
+    analyze();
+  }
+
+  async function disconnect() {
+    keepReading = false;
+    if (reader) { try { await reader.cancel(); } catch {} }
+  }
+
+  if ('serial' in navigator) {
+    navigator.serial.addEventListener('disconnect', () => { keepReading = false; });
+  }
+
+  const RULES = [
+    { k: /kernel panic/i, t: 'انهيار النواة (Kernel panic)', s: 'راجع الأسطر التي قبل الرسالة مباشرة لمعرفة الوحدة المسببة.' },
+    { k: /unable to mount root|cannot open root|mount.*fail/i, t: 'فشل تركيب النظام', s: 'قد تكون الأقسام تالفة أو الذاكرة لا تُقرأ. افحص الأقسام والذاكرة.' },
+    { k: /mmc\d?.*(error|timeout|fail)|emmc.*(error|fail)/i, t: 'خطأ في ذاكرة eMMC', s: 'قد يدل على مشكلة في الذاكرة أو اتصالها. افحص الاتصال واللحام قبل أي استبدال.' },
+    { k: /i\/o error|buffer i\/o/i, t: 'خطأ إدخال وإخراج', s: 'قد يكون بسبب قسم تالف أو ذاكرة ضعيفة. جرّب فحص القسم المذكور في السجل.' },
+    { k: /watchdog|wdt/i, t: 'مؤقت الحماية (Watchdog)', s: 'إعادة تشغيل بسبب تعليق النظام. انظر ما حدث قبلها مباشرة.' },
+    { k: /ddr|dram.*(fail|error|training)/i, t: 'مشكلة في الرام', s: 'قد يدل على فشل تهيئة الرام. افحص الاتصال وجرّب إعادة التشغيل.' },
+    { k: /thermal|over.?temp/i, t: 'حرارة عالية', s: 'قد يكون الهاتف يطفئ نفسه بسبب الحرارة. افحص حساس الحرارة والبطارية.' },
+    { k: /low battery|battery.*(low|critical)/i, t: 'بطارية منخفضة', s: 'جرّب الشحن بشاحن آخر ثم أعد القراءة.' },
+    { k: /dm-verity|verified boot|\bavb\b|secure boot/i, t: 'فشل التحقق من الإقلاع', s: 'قد يكون النظام معدّلاً أو تالفاً. قد يحتاج الهاتف إلى إعادة تثبيت النظام.' },
+    { k: /segfault|segmentation fault/i, t: 'انهيار برنامج (Segfault)', s: 'ابحث عن اسم البرنامج المنهار في السجل.' },
+    { k: /out of memory|oom-killer/i, t: 'نفاد الذاكرة', s: 'قد يكون هناك تطبيق يستهلك الذاكرة، أو الرام فيها مشكلة.' },
+    { k: /\b(error|fail(ed|ure)?|fatal)\b/i, t: 'أخطاء عامة', s: 'ابحث عن أول خطأ في السجل، لأنه غالباً سبب ما بعده.' }
+  ];
+
+  function analyze() {
+    const lines = text.split('\n').filter(l => l.trim());
+    const sum = $('u-summary'), fl = $('u-findings'), sl = $('u-suggestions');
+    sum.textContent = ''; fl.textContent = ''; sl.textContent = '';
+    if (!lines.length) {
+      sum.textContent = 'لا يوجد سجل لتحليله. اقرأ السجل أولاً.';
+      $('u-tab-an').textContent = 'التحليل';
+      $('u-tab-sg').textContent = 'الاقتراحات';
+      return;
+    }
+    let found = 0;
+    RULES.forEach(r => {
+      let n = 0, sample = '';
+      lines.forEach(l => { if (r.k.test(l)) { n++; if (!sample) sample = l.trim().slice(0, 160); } });
+      if (!n) return;
+      found++;
+      const li = document.createElement('li');
+      const h = document.createElement('strong'); h.textContent = r.t + ' (' + n + ')';
+      const c = document.createElement('code'); c.textContent = sample;
+      li.append(h, c); fl.append(li);
+
+      const si = document.createElement('li');
+      const sh = document.createElement('strong'); sh.textContent = r.t;
+      const sp = document.createElement('p'); sp.style.margin = '4px 0 0'; sp.style.color = 'var(--muted)'; sp.textContent = r.s;
+      si.append(sh, sp); sl.append(si);
+    });
+    sum.textContent = found
+      ? 'عدد الأسطر: ' + lines.length + ' — تم رصد ' + found + ' نوع من الأخطاء.'
+      : 'عدد الأسطر: ' + lines.length + ' — لم يُرصد خطأ معروف.';
+    $('u-tab-an').textContent = 'التحليل' + (found ? ' (' + found + ')' : '');
+    $('u-tab-sg').textContent = 'الاقتراحات' + (found ? ' (' + found + ')' : '');
+  }
+
+  $('u-tab-an').onclick = () => {
+    $('u-tab-an').setAttribute('aria-selected', 'true');
+    $('u-tab-sg').setAttribute('aria-selected', 'false');
+    $('u-panel-an').hidden = false;
+    $('u-panel-sg').hidden = true;
+  };
+  $('u-tab-sg').onclick = () => {
+    $('u-tab-an').setAttribute('aria-selected', 'false');
+    $('u-tab-sg').setAttribute('aria-selected', 'true');
+    $('u-panel-an').hidden = true;
+    $('u-panel-sg').hidden = false;
+  };
+  $('u-analyze').onclick = () => { analyze(); toast('تم تحليل السجل'); };
+  $('u-copyai').onclick = async () => {
+    const prompt = 'حلّل سجل UART التالي لهاتف أندرويد، وحدد سبب المشكلة وطرق الإصلاح:\n\n' + text.slice(-20000);
+    if (await copyText(prompt)) toast('تم نسخ السجل للذكاء الاصطناعي');
+  };
+  $('u-expand').onclick = () => {
+    const b = logEl.classList.toggle('big');
+    $('u-expand').textContent = b ? 'تصغير' : 'تكبير';
+  };
+
+  const updSoc = () => {
+    const soc = SOC_OPTIONS.find(x => x.id === currentSoc);
+    const note = soc ? soc.note : '';
+    const rec = soc ? soc.baud : '';
+    $('u-soc-label').textContent = soc ? soc.name : '— اختر المعالج —';
+    $('u-baud-label').textContent = currentBaud;
+    $('u-baudhint').textContent = note;
+    $('u-socbar').hidden = !note;
+    const show = !!rec && rec !== currentBaud;
+    $('u-usebaud').hidden = !show;
+    if (show) { $('u-usebaud').textContent = 'استخدم ' + rec; $('u-usebaud').dataset.baud = rec; }
+  };
+
+  const selectModal = $('select-modal');
+  const selectGrid = $('select-modal-grid');
+  const selectTitle = $('select-modal-title');
+  const closeSelectModal = () => {
+    selectModal.classList.remove('open');
+    window.lockScroll(false);
+  };
+
+  $('select-modal-close').onclick = closeSelectModal;
+  selectModal.addEventListener('click', e => { if (e.target === selectModal) closeSelectModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && selectModal.classList.contains('open')) closeSelectModal(); });
+
+  $('u-soc-btn').onclick = () => {
+    selectTitle.textContent = 'اختر معالج الهاتف (SoC)';
+    selectGrid.className = 'select-grid';
+    selectGrid.textContent = '';
+    SOC_OPTIONS.forEach(opt => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'opt-card' + (currentSoc === opt.id ? ' selected' : '');
+      btn.innerHTML = `<div class="opt-top"><span class="opt-title">${opt.name}</span>${opt.baud ? `<span class="opt-baud">${opt.baud}</span>` : ''}</div><span class="opt-hint">${opt.note}</span>`;
+      btn.onclick = () => {
+        currentSoc = opt.id;
+        updSoc();
+        const step2 = document.querySelectorAll('#uart-steps .step')[1];
+        if (step2) { step2.classList.add('done'); step2.classList.remove('active'); }
+        closeSelectModal();
+        toast('تم اختيار: ' + opt.name);
+      };
+      selectGrid.append(btn);
+    });
+    selectModal.classList.add('open');
+    window.lockScroll(true);
+  };
+
+  $('u-baud-btn').onclick = () => {
+    selectTitle.textContent = 'اختر سرعة النقل (Baud Rate)';
+    selectGrid.className = 'select-grid baud-grid';
+    selectGrid.textContent = '';
+    BAUD_OPTIONS.forEach(b => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'opt-card baud-opt' + (currentBaud === b ? ' selected' : '');
+      btn.textContent = b;
+      btn.onclick = () => {
+        currentBaud = b;
+        updSoc();
+        const step3 = document.querySelectorAll('#uart-steps .step')[2];
+        if (step3) { step3.classList.add('done'); step3.classList.remove('active'); }
+        closeSelectModal();
+        toast('تم ضبط السرعة على ' + b);
+      };
+      selectGrid.append(btn);
+    });
+    selectModal.classList.add('open');
+    window.lockScroll(true);
+  };
+
+  $('u-usebaud').onclick = () => {
+    currentBaud = $('u-usebaud').dataset.baud;
+    updSoc();
+    toast('تم تطبيق السرعة ' + currentBaud);
+  };
+  $('u-connect').onclick = connect;
+  $('u-disconnect').onclick = disconnect;
+  $('u-clear').onclick = () => { text = ''; render(); };
+  $('u-copy').onclick = async () => { if (await copyText(text)) toast('تم نسخ السجل'); };
+  $('u-save').onclick = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+    a.download = 'uart-log-' + new Date().toISOString().replace(/[:.]/g, '-') + '.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('تم حفظ الملف');
+  };
+})();
+
+// ===== ADB READER LOGIC =====
+(() => {
+  const $ = id => document.getElementById(id);
+  const errEl = $('a-err'), infoEl = $('a-info'), statusEl = $('a-status');
+  let adb = null, lib = null, rows = [], lastErr = '';
+
+  const CDN = 'https://esm.sh/@yume-chan/';
+  const V = '@1.1.0';
+
+  async function loadLib() {
+    if (lib) return lib;
+    const [core, usb, cred] = await Promise.all([
+      import(CDN + 'adb' + V),
+      import(CDN + 'adb-daemon-webusb' + V),
+      import(CDN + 'adb-credential-web' + V)
+    ]);
+    lib = { Adb: core.Adb, Transport: core.AdbDaemonTransport, Manager: usb.AdbDaemonWebUsbDeviceManager, Store: cred.default ?? cred.AdbWebCredentialStore };
+    return lib;
+  }
+
+  const get = async cmd => {
+    const sp = adb.subprocess;
+    const tries = [
+      async () => (await sp.noneProtocol.spawnWaitText(cmd)),
+      async () => (await sp.shellProtocol.spawnWaitText(cmd)).stdout,
+      async () => (await sp.spawnAndWait(cmd)).stdout,
+      async () => (await sp.spawnWaitText(cmd))
+    ];
+    for (const t of tries) {
+      try {
+        const out = await t();
+        if (typeof out === 'string') return out.trim();
+      } catch (e) { lastErr = e && e.message ? e.message : String(e); }
+    }
+    return '';
+  };
+  const prop = k => get('getprop ' + k);
+  const first = async keys => { for (const k of keys) { const v = await prop(k); if (v) return v; } return ''; };
+
+  function imeiFromParcel(t) {
+    return [...t.matchAll(/'([^']*)'/g)].map(m => m[1]).join('').replace(/\./g, '');
+  }
+  const luhn = n => { let s = 0; for (let i = 0; i < n.length; i++) { let d = +n[n.length - 1 - i]; if (i % 2) { d *= 2; if (d > 9) d -= 9; } s += d; } return s % 10 === 0; };
+  async function readImeis() {
+    const found = [];
+    const add = t => { for (const m of (t.match(/\d{15}/g) || [])) if (luhn(m) && !found.includes(m)) found.push(m); };
+    for (const slot of [0, 1]) add(await get('cmd phone get-imei ' + slot));
+    if (found.length >= 2) return found;
+    add(await get('dumpsys iphonesubinfo'));
+    (await get('getprop')).split('\n').filter(l => /imei/i.test(l)).forEach(add);
+    if (found.length >= 2) return found;
+    const args = ['', 'i32 0', 'i32 1', 's16 com.android.shell', 'i32 0 s16 com.android.shell', 'i32 1 s16 com.android.shell', 'i32 2 s16 com.android.shell'];
+    for (const code of [1, 2, 3, 4, 5, 6]) {
+      for (const a of args) {
+        add(imeiFromParcel(await get('service call iphonesubinfo ' + code + ' ' + a)));
+        if (found.length >= 2) return found;
+      }
+    }
+    return found;
+  }
+
+  const MACRE = /\b([0-9a-f]{2}(?::[0-9a-f]{2}){5})\b/gi;
+  const macsIn = t => [...t.matchAll(MACRE)].map(m => m[1].toLowerCase()).filter(m => !['00:00:00:00:00:00', '02:00:00:00:00:00', 'ff:ff:ff:ff:ff:ff'].includes(m));
+  const isLocal = m => (parseInt(m.slice(0, 2), 16) & 2) !== 0;
+  function pickMac(list) {
+    const g = list.find(m => !isLocal(m));
+    if (g) return g;
+    return list[0] ? list[0] + ' (عشوائي)' : '';
+  }
+  async function readWifiMac() {
+    const c = [];
+    const names = (await get('ls /sys/class/net')).split(/\s+/).filter(n => /^(wlan|swlan|wifi)/.test(n));
+    for (const n of (names.length ? names : ['wlan0'])) {
+      c.push(...macsIn(await get('cat /sys/class/net/' + n + '/address')));
+      c.push(...macsIn(await get('ip addr show ' + n)));
+      c.push(...macsIn(await get('ifconfig ' + n)));
+    }
+    for (const l of (await get('dumpsys wifi')).split('\n')) {
+      const f = l.match(/factory[^\n]*?([0-9a-f]{2}(?::[0-9a-f]{2}){5})/i);
+      if (f) c.push(f[1].toLowerCase());
+      const m = l.match(/\bMAC:\s*([0-9a-f]{2}(?::[0-9a-f]{2}){5})/i);
+      if (m) c.push(m[1].toLowerCase());
+    }
+    c.push(...macsIn(await get('getprop ro.boot.wifimacaddr')));
+    return pickMac([...new Set(c)].filter(m => !['00:00:00:00:00:00', '02:00:00:00:00:00'].includes(m)));
+  }
+  async function readBtMac() {
+    const c = [];
+    c.push(...macsIn(await get('settings get secure bluetooth_address')));
+    for (const l of (await get('dumpsys bluetooth_manager')).split('\n')) {
+      if (/^\s*address\s*:/i.test(l)) c.push(...macsIn(l));
+    }
+    for (const k of ['ro.boot.btmacaddr', 'persist.vendor.bluetooth.bdaddr', 'persist.service.bdroid.bdaddr']) c.push(...macsIn(await prop(k)));
+    return pickMac([...new Set(c)]);
+  }
+
+  const GROUPS = [
+    ['الجهاز', ['الموديل', 'الشركة', 'الاسم الداخلي', 'إصدار أندرويد', 'مستوى API', 'تحديث الأمان', 'رقم البناء']],
+    ['الهوية والاتصالات', ['Baseband', 'الرقم التسلسلي', 'IMEI 1', 'IMEI 2', 'Wi-Fi MAC', 'Bluetooth MAC']]
+  ];
+  function render() {
+    infoEl.textContent = '';
+    if (!rows.length) {
+      const e = document.createElement('p');
+      e.className = 'empty-box';
+      e.textContent = adb ? 'جارٍ قراءة المعلومات...' : 'لا توجد معلومات بعد. وصّل الهاتف ثم اضغط «اتصال بالهاتف».';
+      infoEl.append(e);
+      return;
+    }
+    GROUPS.forEach(([title, labels]) => {
+      const items = rows.filter(r => labels.includes(r[0]));
+      if (!items.length) return;
+      const h = document.createElement('h2'); h.className = 'gh'; h.textContent = title;
+      const g = document.createElement('div'); g.className = 'grid';
+      items.forEach(([label, value]) => {
+        const d = document.createElement('button'); d.className = 'row';
+        const k = document.createElement('span'); k.className = 'k'; k.textContent = label;
+        const v = document.createElement('span'); v.className = 'v';
+        if (value) {
+          v.textContent = value;
+          d.title = 'اضغط للنسخ';
+          d.onclick = async () => { if (await copyText(value)) toast('تم نسخ ' + label); };
+        } else {
+          v.textContent = 'غير متاح'; v.className = 'v na'; d.disabled = true;
+        }
+        d.append(k, v); g.append(d);
+      });
+      infoEl.append(h, g);
+    });
+  }
+
+  function setState(on) {
+    $('a-connect').disabled = on;
+    $('a-disconnect').disabled = !on;
+    $('a-copy').disabled = !on;
+    document.querySelectorAll('.a-lg, .a-tg').forEach(b => { b.disabled = !on; });
+    $('a-tauto').disabled = !on;
+    if (!on) stopAuto();
+    statusEl.className = on ? 'status-pill on' : 'status-pill';
+    statusEl.textContent = on ? 'متصل' : 'غير متصل';
+  }
+
+  async function readInfo() {
+    const [model, brand, device, rel, sdk, patch, build, base, serial] = await Promise.all([
+      prop('ro.product.model'), prop('ro.product.manufacturer'), prop('ro.product.device'),
+      prop('ro.build.version.release'), prop('ro.build.version.sdk'), prop('ro.build.version.security_patch'),
+      prop('ro.build.display.id'), first(['gsm.version.baseband', 'ro.baseband', 'ro.build.expect.baseband']), prop('ro.serialno')
+    ]);
+    rows = [['الموديل', model], ['الشركة', brand], ['الاسم الداخلي', device], ['إصدار أندرويد', rel],
+            ['مستوى API', sdk], ['تحديث الأمان', patch], ['رقم البناء', build], ['Baseband', base], ['الرقم التسلسلي', serial]];
+    render();
+    const imeis = await readImeis();
+    rows.push(['IMEI 1', imeis[0] || ''], ['IMEI 2', imeis[1] || '']);
+    render();
+    rows.push(['Wi-Fi MAC', await readWifiMac()]);
+    render();
+    rows.push(['Bluetooth MAC', await readBtMac()]);
+    render();
+  }
+
+  async function connect() {
+    errEl.textContent = '';
+    try {
+      if (!navigator.usb) throw new Error('هذا المتصفح لا يدعم WebUSB. استخدم Chrome أو Edge، وافتح الصفحة عبر localhost أو HTTPS.');
+      statusEl.textContent = 'جارٍ التحميل...';
+      const L = await loadLib();
+      const device = await L.Manager.BROWSER.requestDevice();
+      if (!device) { setState(false); return; }
+      statusEl.textContent = 'وافق على الرسالة في الهاتف...';
+      const connection = await device.connect();
+      const transport = await L.Transport.authenticate({ serial: device.serial, connection, credentialStore: new L.Store('Cpu-team') });
+      adb = new L.Adb(transport);
+      setState(true);
+      toast('تم الاتصال بالهاتف');
+      render();
+      await readInfo();
+    } catch (e) {
+      errEl.textContent = 'تعذّر الاتصال: ' + (e && e.message ? e.message : e);
+      setState(false);
+      adb = null;
+    }
+  }
+
+  async function disconnect() {
+    try { if (adb) await adb.close(); } catch {}
+    adb = null; rows = []; render(); setState(false);
+    logText = ''; $('a-logview').textContent = ''; $('a-lcopy').disabled = true; $('a-lsave').disabled = true; $('a-lstatus').textContent = '';
+    stopAuto(); $('a-thermal').innerHTML = '<p class="empty-box">اضغط «قراءة الحرارة» بعد الاتصال بالهاتف.</p>'; $('a-tstatus').textContent = '';
+    toast('تم قطع الاتصال');
+  }
+
+  let logText = '', logName = '', fullLog = '';
+  const sec = (t, b) => '===== ' + t + ' =====\n' + (b && b.trim() ? b : '(لا يوجد)') + '\n\n';
+  const head = (t, n) => t.split('\n').slice(0, n).join('\n');
+  const tail = (t, n) => t.split('\n').slice(-n).join('\n');
+  const filt = (t, re) => t.split('\n').filter(l => re.test(l)).join('\n');
+  const THERMAL_CMD = 'for z in /sys/class/thermal/thermal_zone*; do echo "$(cat $z/type 2>/dev/null) = $(cat $z/temp 2>/dev/null)"; done';
+
+  const LOGS = {
+    wifi: async () => sec('dumpsys wifi', head(await get('dumpsys wifi'), 400)) + sec('logcat – Wi-Fi', filt(fullLog, /wifi|wlan|wpa_supplicant|supplicant/i)),
+    bt: async () => sec('dumpsys bluetooth_manager', head(await get('dumpsys bluetooth_manager'), 300)) + sec('logcat – Bluetooth', filt(fullLog, /bluetooth|bluedroid|btif|bt_stack|bt_/i)),
+    cell: async () => sec('dumpsys telephony.registry', head(await get('dumpsys telephony.registry'), 300)) + sec('logcat radio', tail(await get('logcat -d -b radio -v threadtime'), 3000)),
+    thermal: async () => sec('dumpsys thermalservice', await get('dumpsys thermalservice')) + sec('thermal zones', await get(THERMAL_CMD)) + sec('dumpsys battery', await get('dumpsys battery'))
+  };
+
+  async function runLog(k) {
+    errEl.textContent = '';
+    document.querySelectorAll('.a-lg').forEach(b => b.disabled = true);
+    $('a-lstatus').textContent = 'جارٍ القراءة...';
+    try {
+      fullLog = await get('logcat -d -b all -v threadtime');
+      if (!fullLog) fullLog = await get('logcat -d -v threadtime');
+      logText = await LOGS[k]();
+      logName = k;
+      $('a-logview').textContent = logText.length > 300000 ? '... (تم عرض آخر جزء فقط)\n' + logText.slice(-300000) : logText;
+      $('a-lcopy').disabled = false; $('a-lsave').disabled = false;
+      $('a-lstatus').textContent = 'تم';
+      toast('تمت قراءة السجل');
+    } catch (e) {
+      errEl.textContent = 'تعذّر قراءة السجل: ' + (e && e.message ? e.message : e);
+      $('a-lstatus').textContent = '';
+    }
+    document.querySelectorAll('.a-lg').forEach(b => b.disabled = !adb);
+  }
+  document.querySelectorAll('.a-lg').forEach(b => b.onclick = () => runLog(b.dataset.k));
+  $('a-lcopy').onclick = async () => { if (await copyText(logText)) toast('تم نسخ السجل'); };
+  $('a-lsave').onclick = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([logText], { type: 'text/plain' }));
+    a.download = logName + '-log-' + new Date().toISOString().replace(/[:.]/g, '-') + '.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('تم حفظ الملف');
+  };
+  $('a-lexpand').onclick = () => {
+    const b = $('a-logview').classList.toggle('big');
+    $('a-lexpand').textContent = b ? 'تصغير' : 'تكبير';
+  };
+
+  // Thermal parsing & rendering
+  const T_TYPES = {1:'المعالج',2:'الرسوميات',3:'البطارية',4:'الجلد',5:'منفذ USB',6:'مضخم الطاقة',10:'NPU',11:'TPU',12:'الشاشة',13:'المودم',14:'SoC'};
+  const T_STATUS = ['طبيعي','خفيف','متوسط','شديد','حرج','طارئ','إيقاف'];
+  const LV = ['طبيعي','دافئ','مرتفع','خطر'], LC = ['ok','warn','hot','crit'];
+  const B_STATUS = {1:'غير معروف',2:'تشحن',3:'تفرغ',4:'لا تشحن',5:'ممتلئة'};
+  const B_HEALTH = {2:'جيدة',3:'سخنة (Overheat)',4:'تالفة',5:'جهد زائد',6:'فشل',7:'باردة'};
+  const levelOf = (v, type) => { const [w, h, c] = [3, 4, 5].includes(type) ? [40, 45, 50] : [70, 85, 95]; return v >= c ? 3 : v >= h ? 2 : v >= w ? 1 : 0; };
+  const fmtT = v => v.toFixed(1) + '°C';
+  function guessType(n) {
+    n = n.toLowerCase();
+    if (/batt|bms|charger/.test(n)) return 3;
+    if (/skin|quiet|xo|case|shell|back/.test(n)) return 4;
+    if (/gpu|kgsl/.test(n)) return 2;
+    if (/cpu|big|little|mid|soc|tsens|apc|cluster|core/.test(n)) return 1;
+    return 0;
+  }
+  const normTemp = v => { if (!isFinite(v)) return NaN; const a = Math.abs(v); const c = a >= 1000 ? v / 1000 : a >= 150 ? v / 10 : v; return (c > -30 && c < 160) ? c : NaN; };
+  function parseService(t) {
+    const list = [], seen = new Set();
+    for (const m of t.matchAll(/Temperature\{mValue=(-?[\d.]+(?:E-?\d+)?),\s*mType=(\d+),\s*mName=([^,}]*),\s*mStatus=(\d+)\}/g)) {
+      const v = +m[1], type = +m[2], name = m[3].trim(), key = type + '|' + name;
+      if (!isFinite(v) || seen.has(key)) continue;
+      seen.add(key); list.push({ v, type, name });
+    }
+    const st = t.match(/Thermal Status:\s*(\d+)/i);
+    return { list, status: st ? +st[1] : null };
+  }
+  function parseZones(t) {
+    const out = [];
+    for (const l of t.split('\n')) {
+      const m = l.match(/^(.+?)\s=\s*(-?\d+)\s*$/);
+      if (!m) continue;
+      const v = normTemp(+m[2]);
+      if (isNaN(v)) continue;
+      const name = m[1].trim();
+      out.push({ v, type: guessType(name), name });
+    }
+    return out;
+  }
+  function parseBattery(t) {
+    const g = r => { const m = t.match(r); return m ? +m[1] : null; };
+    const temp = g(/temperature:\s*(-?\d+)/);
+    return { temp: temp == null ? null : temp / 10, level: g(/level:\s*(\d+)/), status: g(/status:\s*(\d+)/), health: g(/health:\s*(\d+)/) };
+  }
+  function tcard(k, v, lvl, chip) {
+    const d = document.createElement('div'); d.className = 'tc';
+    const kk = document.createElement('span'); kk.className = 'k'; kk.textContent = k;
+    const vv = document.createElement('span'); vv.className = 'v' + (lvl != null ? ' ' + LC[lvl] : ''); vv.textContent = v;
+    d.append(kk, vv);
+    if (chip && lvl != null) { const c = document.createElement('span'); c.className = 'lvl ' + LC[lvl]; c.textContent = LV[lvl]; d.append(c); }
+    return d;
+  }
+  function renderThermal(S, B, Z) {
+    const root = $('a-thermal'); root.textContent = '';
+    const main = S.list.length ? S.list : Z;
+    const bTemp = B.temp != null ? B.temp : (S.list.find(x => x.type === 3) || {}).v ?? null;
+    if (!main.length && bTemp == null && S.status == null) {
+      const e = document.createElement('p'); e.className = 'empty-box'; e.textContent = 'لم يتم العثور على بيانات الحرارة في هذا الهاتف.'; root.append(e); return;
+    }
+    const sorted = main.slice().sort((a, b) => b.v - a.v);
+    const hot = sorted[0];
+    const g = document.createElement('div'); g.className = 'tgrid';
+    const stLvl = S.status == null ? null : (S.status >= 3 ? 3 : S.status);
+    g.append(tcard('حالة الحرارة (النظام)', S.status == null ? 'غير متاح' : (T_STATUS[S.status] || String(S.status)), stLvl, false));
+    g.append(tcard('حرارة البطارية', bTemp == null ? 'غير متاح' : fmtT(bTemp), bTemp == null ? null : levelOf(bTemp, 3), true));
+    if (hot) g.append(tcard('أعلى حساس: ' + hot.name, fmtT(hot.v), levelOf(hot.v, hot.type), true));
+    if (B.level != null) g.append(tcard('الشحن', B.level + '% — ' + (B_STATUS[B.status] || ''), null, false));
+    if (B.health != null) g.append(tcard('صحة البطارية', B_HEALTH[B.health] || String(B.health), B.health === 2 ? 0 : B.health === 7 ? 1 : 3, false));
+    root.append(g);
+
+    if (sorted.length) {
+      const h = document.createElement('h3'); h.className = 'gh'; h.textContent = 'أسخن الحساسات'; root.append(h);
+      const sg = document.createElement('div'); sg.className = 'tgrid';
+      sorted.slice(0, 8).forEach(x => sg.append(tcard((T_TYPES[x.type] || 'حساس') + ' — ' + x.name, fmtT(x.v), levelOf(x.v, x.type), true)));
+      root.append(sg);
+    }
+
+    const lv = Math.max(stLvl == null ? 0 : stLvl, sorted.length ? Math.max(...sorted.map(x => levelOf(x.v, x.type))) : 0, bTemp == null ? 0 : levelOf(bTemp, 3));
+    let msg, cls;
+    if (lv >= 3 || B.health === 3) { msg = 'حرارة الهاتف خطرة الآن. افصل الشاحن وأوقف الاستخدام ودعه يبرد.'; cls = 'crit'; }
+    else if (lv >= 1) { msg = 'الهاتف دافئ أو ساخن. أغلق التطبيقات الثقيلة وافصل الشاحن.'; cls = 'warn'; }
+    else { msg = 'لا توجد مشكلة حرارية ظاهرة الآن.'; cls = 'ok'; }
+    const a = document.createElement('p'); a.className = 'advice ' + cls; a.textContent = msg;
+    root.append(a);
+  }
+
+  let tbusy = false, ttimer = null;
+  async function readThermal(silent) {
+    if (!adb || tbusy) return;
+    tbusy = true; $('a-tstatus').textContent = 'جارٍ القراءة...';
+    try {
+      const [svc, bat, zones] = await Promise.all([get('dumpsys thermalservice'), get('dumpsys battery'), get(THERMAL_CMD)]);
+      renderThermal(parseService(svc), parseBattery(bat), parseZones(zones));
+      $('a-tstatus').textContent = 'آخر تحديث: ' + new Date().toLocaleTimeString('ar-EG');
+      if (!silent) toast('تمت قراءة الحرارة');
+    } catch (e) {
+      errEl.textContent = 'تعذّر قراءة الحرارة: ' + (e && e.message ? e.message : e);
+      $('a-tstatus').textContent = '';
+    }
+    tbusy = false;
+  }
+  function stopAuto() { clearInterval(ttimer); ttimer = null; $('a-tauto').checked = false; }
+  $('a-tread').onclick = () => readThermal(false);
+  $('a-tauto').onchange = () => {
+    if ($('a-tauto').checked) { readThermal(true); ttimer = setInterval(() => readThermal(true), 5000); }
+    else stopAuto();
+  };
+
+  $('a-connect').onclick = connect;
+  $('a-disconnect').onclick = disconnect;
+  $('a-copy').onclick = async () => {
+    if (await copyText(rows.map(([l, v]) => l + ': ' + (v || '-')).join('\n'))) toast('تم نسخ المعلومات');
+  };
+})();
+
+// ===== FASTBOOT READER LOGIC =====
+(() => {
+  const $ = id => document.getElementById(id);
+  const errEl = $('f-err'), infoEl = $('f-info'), statusEl = $('f-status'), out = $('f-logview');
+  let dev = null, lib = null, outText = '', busy = false;
+
+  async function loadLib() {
+    if (lib) return lib;
+    lib = await import('https://esm.sh/android-fastboot@1.1.3');
+    return lib;
+  }
+  const textOf = r => (typeof r === 'string' ? r : (r && (r.text ?? r.response)) ?? '');
+  const cmd = async c => String(textOf(await dev.runCommand(c)) || '').trim();
+  const gv = async n => { try { const v = await dev.getVariable(n); return v == null ? '' : String(v).trim(); } catch { return ''; } };
+
+  function log(s) {
+    outText += s + '\n';
+    out.textContent = outText;
+    out.scrollTop = out.scrollHeight;
+    ['f-lcopy', 'f-lsave', 'f-lclear'].forEach(i => $(i).disabled = false);
+  }
+  function setState(on) {
+    $('f-connect').disabled = on;
+    $('f-disconnect').disabled = !on;
+    document.querySelectorAll('.f-tg').forEach(b => { b.disabled = !on; });
+    $('f-cmd').disabled = !on;
+    statusEl.className = on ? 'status-pill on' : 'status-pill';
+    statusEl.textContent = on ? 'متصل' : 'غير متصل';
+    if (!on) $('f-slotbar').hidden = true;
+  }
+
+  const VARS = [['product', 'المنتج'], ['variant', 'النسخة'], ['hw-revision', 'مراجعة العتاد'], ['serialno', 'الرقم التسلسلي'],
+    ['version-bootloader', 'إصدار Bootloader'], ['version-baseband', 'إصدار Baseband'], ['current-slot', 'الفتحة الحالية'],
+    ['slot-count', 'عدد الفتحات'], ['max-download-size', 'أقصى حجم تحميل'], ['battery-voltage', 'جهد البطارية'], ['secure', 'Secure']];
+
+  function card(k, v, cls) {
+    const d = document.createElement('div'); d.className = 'tc';
+    const kk = document.createElement('span'); kk.className = 'k'; kk.textContent = k;
+    const vv = document.createElement('span'); vv.className = 'v ' + (cls || ''); vv.textContent = v;
+    d.append(kk, vv); return d;
+  }
+  function row(label, value) {
+    const d = document.createElement('button'); d.className = 'row';
+    const k = document.createElement('span'); k.className = 'k'; k.textContent = label;
+    const v = document.createElement('span'); v.className = 'v';
+    if (value) { v.textContent = value; d.title = 'اضغط للنسخ'; d.onclick = async () => { if (await copyText(value)) toast('تم نسخ ' + label); }; }
+    else { v.textContent = 'غير متاح'; v.className = 'v na'; d.disabled = true; }
+    d.append(k, v); return d;
+  }
+
+  async function readInfo() {
+    if (!dev || busy) return;
+    busy = true; errEl.textContent = '';
+    infoEl.innerHTML = '<p class="empty-box">جارٍ قراءة المعلومات...</p>';
+    try {
+      const vals = {};
+      for (const [k] of VARS) vals[k] = await gv(k);
+      const unl = (await gv('unlocked')).toLowerCase();
+      let state = (unl === 'yes' || unl === 'true') ? 'unlocked' : (unl === 'no' || unl === 'false') ? 'locked' : '';
+      if (!state) {
+        try { const m = (await cmd('oem device-info')).match(/unlocked:\s*(true|false)/i); if (m) state = m[1].toLowerCase() === 'true' ? 'unlocked' : 'locked'; } catch {}
+      }
+      const us = (await gv('is-userspace')).toLowerCase();
+      infoEl.textContent = '';
+      const top = document.createElement('div'); top.className = 'tgrid';
+      top.append(card('حالة Bootloader', state === 'unlocked' ? 'مفتوح' : state === 'locked' ? 'مقفل' : 'غير معروف', state === 'unlocked' ? 'warn' : state === 'locked' ? 'ok' : ''));
+      top.append(card('الوضع الحالي', us === 'yes' ? 'fastbootd' : us === 'no' ? 'bootloader' : 'غير معروف', ''));
+      infoEl.append(top);
+
+      const g = document.createElement('div'); g.className = 'grid'; g.style.marginTop = '10px';
+      VARS.forEach(([k, label]) => {
+        let v = vals[k];
+        if (k === 'max-download-size' && /^0x[0-9a-f]+$/i.test(v)) v = Math.round(parseInt(v, 16) / 1048576) + ' MB';
+        g.append(row(label, v));
+      });
+      infoEl.append(g);
+      $('f-slotbar').hidden = !(parseInt(vals['slot-count'], 10) > 1);
+      toast('تمت قراءة المعلومات');
+    } catch (e) {
+      infoEl.textContent = '';
+      errEl.textContent = 'تعذّر قراءة المعلومات: ' + (e && e.message ? e.message : e);
+    }
+    busy = false;
+  }
+
+  async function connect() {
+    errEl.textContent = '';
+    try {
+      if (!navigator.usb) throw new Error('هذا المتصفح لا يدعم WebUSB. استخدم Chrome أو Edge، وافتح الصفحة عبر localhost أو HTTPS.');
+      statusEl.textContent = 'جارٍ التحميل...';
+      const L = await loadLib();
+      dev = new L.FastbootDevice();
+      await dev.connect();
+      setState(true);
+      toast('تم الاتصال بالهاتف');
+      await readInfo();
+    } catch (e) {
+      errEl.textContent = 'تعذّر الاتصال: ' + (e && e.message ? e.message : e);
+      setState(false); dev = null;
+    }
+  }
+  async function disconnect(msg) {
+    try { if (dev && dev.device) await dev.device.close(); } catch {}
+    dev = null; infoEl.innerHTML = '<p class="empty-box">اتصل بالهاتف في وضع Fastboot لقراءة المعلومات.</p>'; setState(false);
+    toast(msg || 'تم قطع الاتصال');
+  }
+  if (navigator.usb) navigator.usb.addEventListener('disconnect', () => { if (dev) disconnect('انقطع الاتصال بالهاتف'); });
+
+  const DANGER = {
+    unlock: ['flashing unlock', 'فتح Bootloader سيمسح كل بيانات الهاتف وقد يلغي الضمان. هل تريد المتابعة؟'],
+    lock: ['flashing lock', 'قفل Bootloader على نظام معدّل قد يمنع الهاتف من الإقلاع. هل تريد المتابعة؟'],
+    erase: ['erase:userdata', 'سيتم مسح كل بيانات المستخدم في الهاتف نهائياً. هل تريد المتابعة؟']
+  };
+
+  async function run(c, label) {
+    if (!dev) return;
+    log('> ' + c);
+    try {
+      const t = await cmd(c);
+      log(t || '(تم بدون رد)');
+      toast('تم تنفيذ: ' + (label || c));
+    } catch (e) {
+      log('خطأ: ' + (e && e.message ? e.message : e));
+      errEl.textContent = 'فشل الأمر: ' + (e && e.message ? e.message : e);
+    }
+  }
+  async function doReboot(target) {
+    if (!dev) return;
+    log('> reboot ' + target);
+    try { await dev.reboot(target, false); log('تم إرسال أمر إعادة التشغيل.'); await disconnect('تمت إعادة التشغيل'); }
+    catch (e) { log('خطأ: ' + (e && e.message ? e.message : e)); errEl.textContent = 'فشل الأمر: ' + (e && e.message ? e.message : e); }
+  }
+
+  document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => doReboot(b.dataset.act === 'reboot' ? '' : b.dataset.act));
+  document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => run(b.dataset.cmd));
+  document.querySelectorAll('[data-danger]').forEach(b => b.onclick = async () => {
+    const [c, msg] = DANGER[b.dataset.danger];
+    if (await askConfirm(msg)) run(c, b.textContent); else toast('تم الإلغاء');
+  });
+
+  const runCustom = async () => {
+    const c = $('f-cmd').value.trim();
+    if (!c) return;
+    if (/^(erase|format|flashing|oem\s+(un)?lock)/i.test(c) && !(await askConfirm('هذا الأمر قد يمسح بيانات أو يغيّر حماية الهاتف: ' + c))) {
+      toast('تم الإلغاء'); return;
+    }
+    run(c);
+  };
+  $('f-run').onclick = runCustom;
+  $('f-cmd').addEventListener('keydown', e => { if (e.key === 'Enter') runCustom(); });
+  $('f-inforead').onclick = readInfo;
+  $('f-connect').onclick = connect;
+  $('f-disconnect').onclick = () => disconnect();
+  $('f-lclear').onclick = () => { outText = ''; out.textContent = ''; ['f-lcopy', 'f-lsave', 'f-lclear'].forEach(i => $(i).disabled = true); };
+  $('f-lcopy').onclick = async () => { if (await copyText(outText)) toast('تم نسخ النتيجة'); };
+  $('f-lsave').onclick = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([outText], { type: 'text/plain' }));
+    a.download = 'fastboot-' + new Date().toISOString().replace(/[:.]/g, '-') + '.txt';
+    a.click(); URL.revokeObjectURL(a.href); toast('تم حفظ الملف');
+  };
+  $('f-lexpand').onclick = () => {
+    const b = out.classList.toggle('big');
+    $('f-lexpand').textContent = b ? 'تصغير' : 'تكبير';
+  };
+})();
+</script>
+</body>
+</html>
